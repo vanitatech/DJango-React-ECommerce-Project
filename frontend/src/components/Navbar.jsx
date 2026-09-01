@@ -11,7 +11,7 @@ function Navbar() {
             <Link to="/" className="text-2xl font-bold text-gray-800">
                 🛍 VanitaCart
             </Link>
-            <Link to="/cart" className="relative" text-gray-800 hover:text-gray-600 font-medium>
+            <Link to="/cart" className="relative text-gray-800 hover:text-gray-600 font-medium">
                 🛒 Cart
                 <span className="absolute -top-2 -right-3 bg-red-500 text-white text-xs font-bold rounded-full px-2">
                     {cartCount}
