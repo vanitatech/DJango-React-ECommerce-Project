@@ -41,6 +41,14 @@ function ProductDetails() {
         return <div>No product found.</div>;
     }
 
+    const handleAddToCart = () => {
+        if(!localStorage.getItem("access_token")){
+            alert("Please login to add items to the cart.");
+            return;
+        }
+        addToCart(product.id);  
+    };
+
     return (
         <div className="min-h-screen bg-gray-100 flex justify-center items-center py-10">
             <div className="bg-white shadow-lg rounded-2xl p-8 max-w-3xl w-full">
@@ -54,7 +62,7 @@ function ProductDetails() {
                         <h1 className="text-3xl font-bold text-gray-800 mb-2">{product.name}</h1>
                         <p className="text-gray-600 leading-relaxed">{product.description}</p>
                         <p className="text-xl text-green-600 font-semibold mb-4">${product.price}</p>
-                        <button onClick={() => addToCart(product.id)} className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition duration-300">
+                        <button onClick={handleAddToCart} className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition duration-300">
                             Add to Cart 🛒
                         </button>
                         {/* Home button */}
