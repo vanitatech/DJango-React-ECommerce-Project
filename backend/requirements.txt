@@ -1,11 +1,8 @@
-PyAudio
-PyGObject
-dnf
-rpm
-selinux
-cockpit
-blivet
-pyparted
-systemd-python
+Django==6.1
+django-cors-headers
+djangorestframework
+djangorestframework-simplejwt
+python-dotenv
+psycopg[binary]
 gunicorn==26.2.0
 whitenoise==6.12.0
