@@ -1,101 +1,103 @@
-# Full-Stack E-Commerce Application
+# VanitaCart
 
-A full-stack e-commerce application built with **React, Django REST Framework and PostgreSQL**. The project demonstrates user authentication, product management, shopping cart functionality and order creation through a REST API.
+A polished full-stack e-commerce storefront built with Django REST Framework and React. This project is designed to showcase real-world product browsing, authentication, cart flows, and checkout logic in a portfolio-ready application.
 
-## Technologies
+## Why this project matters for a portfolio
+
+This app demonstrates:
+
+- Full-stack architecture across Django and React
+- Secure JWT-based authentication flow
+- Protected API endpoints and cart logic
+- Product catalog UX with search, filtering, and sorting
+- Cart state management and checkout workflow
+- Modern frontend styling with Tailwind
+- A deployable backend/frontend structure suitable for a job portfolio
+
+## Tech stack
 
 ### Frontend
-
-* React
-* React Router
-* JavaScript
-* Tailwind CSS
-* Vite
+- React
+- Vite
+- React Router
+- Tailwind CSS
 
 ### Backend
+- Python
+- Django
+- Django REST Framework
+- Django REST Framework Simple JWT
 
-* Python
-* Django
-* Django REST Framework
-* Simple JWT
-
-### Database & Tools
-
-* PostgreSQL
-* Git & GitHub
-* VS Code
-* Thunder Client
-* AWS
+### Data and tooling
+- SQLite for local development fallback
+- PostgreSQL-ready configuration for production
+- CORS configuration
+- Environment variable support
 
 ## Features
 
-* User registration and login
-* JWT authentication
-* Product and category browsing
-* Product detail pages
-* Shopping cart
-* Add, remove and update cart items
-* Real-time cart quantities and totals
-* Protected checkout route
-* Order creation
-* PostgreSQL database integration
-* RESTful API
-* Environment variable configuration
-* CORS configuration
+- User signup and login
+- JWT access and refresh token flow
+- Product list with search, filtering, and sorting
+- Product detail page
+- Cart with quantity updates and removal
+- Protected checkout flow
+- Order creation with validation
+- Responsive storefront UI for mobile and desktop
 
-## Project Structure
+## Project structure
 
 ```text
 DJango-React-ECommerce-Project/
-│
 ├── backend/
-│   ├── manage.py
+│   ├── backend/
 │   ├── store/
-│   └── ...
-│
+│   ├── manage.py
+│   ├── requirements.txt
+│   └── .env
 ├── frontend/
 │   ├── src/
 │   ├── public/
-│   └── ...
-│
-└── README.md
+│   ├── package.json
+│   └── .env
+├── README.md
+└── .gitignore
 ```
 
-## Authentication
+## Local development
 
-Authentication is implemented using **JSON Web Tokens (JWT)**.
+### 1) Backend
 
-The application provides:
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_store
+python manage.py runserver
+```
 
-* User registration
-* Login
-* Access tokens
-* Refresh tokens
-* Protected routes
-* Authenticated API requests
+### 2) Frontend
 
-Access and refresh tokens are managed by the frontend to allow authenticated users to access protected functionality.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## E-Commerce Functionality
+The frontend expects a backend URL in `frontend/.env`:
 
-The application includes a shopping cart allowing users to:
+```env
+VITE_DJANGO_BASE_URL=http://localhost:8000
+```
 
-1. Browse products
-2. View individual products
-3. Add products to their cart
-4. Change quantities
-5. Remove products
-6. View their cart total
-7. Proceed to checkout
-8. Create an order
-
-The backend manages products, cart items, orders and order items using Django models and PostgreSQL.
-
-## API
-
-The Django REST Framework backend provides API endpoints for functionality including:
+## API overview
 
 ```text
+/api/register/
+/api/token/
+/api/token/refresh/
 /api/products/
 /api/categories/
 /api/cart/
@@ -103,60 +105,27 @@ The Django REST Framework backend provides API endpoints for functionality inclu
 /api/cart/remove/
 /api/cart/update/
 /api/orders/create/
-/api/register/
-/api/token/
-/api/token/refresh/
 ```
 
-The React frontend communicates with these endpoints using HTTP requests and JSON data.
+## What I improved in this version
 
-## Database
+- Fixed broken JWT auth header handling in the frontend
+- Hardened cart and order backend logic with validation
+- Added better product filters and storefront polish
+- Improved responsive product browsing experience
+- Added SQLite fallback so local development works without a Postgres instance
+- Strengthened the project story for portfolio and recruiter review
 
-The application uses **PostgreSQL** as its relational database.
+## Recommended next enhancements
 
-The database contains models for areas including:
+- Add product reviews and ratings
+- Add admin dashboard for managing inventory
+- Implement order history and profile pages
+- Add payment integration
+- Add tests for auth, cart, and checkout flows
+- Add deployment config for Docker or AWS
 
-* Products
-* Categories
-* Users
-* User profiles
-* Cart items
-* Orders
-* Order items
+## License
 
-Django migrations are used to manage database schema changes.
+This project is intended for learning and portfolio use.
 
-## Development & Testing
-
-During development I used **Thunder Client** and VS Code to test API endpoints and debug frontend/backend communication.
-
-Testing and debugging focused on areas including:
-
-* Authentication
-* API requests
-* Cart operations
-* Database interactions
-* Order creation
-* Error handling
-
-## Deployment
-
-The application was also used as a practical exercise in deploying a Django/React application to **AWS**.
-
-Deployment work included:
-
-* Linux server configuration
-* Python virtual environment
-* Django configuration
-* PostgreSQL
-* Frontend production build
-* Environment variables
-* Web server/application configuration
-
-## What I Learned
-
-This project helped me develop practical experience with:
-
-* Full-stack application architecture
-* REST API development
-* Django RES

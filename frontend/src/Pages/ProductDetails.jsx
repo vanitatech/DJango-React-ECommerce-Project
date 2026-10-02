@@ -1,9 +1,10 @@
-import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import {useCart} from "../context/CartContext";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useCart } from "../context/CartContext";
 
 function ProductDetails() {
-    const { id } = useParams()
+    const { id } = useParams();
+    const navigate = useNavigate();
     const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -17,62 +18,88 @@ function ProductDetails() {
                     throw new Error('Failed to fetch product details');
                 }
                 return response.json();
-
             })
             .then((data) => {
                 setProduct(data);
                 setLoading(false);
             })
-            .catch((error) => {
-                setError(error.message);
+            .catch((fetchError) => {
+                setError(fetchError.message);
                 setLoading(false);
             });
     }, [id, BASEURL]);
 
     if (loading) {
-        return <div>Loading...</div>;
+        return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-600">Loading product...</div>;
     }
 
     if (error) {
-        return <div>Error: {error}</div>;
+        return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-red-600">Error: {error}</div>;
     }
 
     if (!product) {
-        return <div>No product found.</div>;
+        return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-600">No product found.</div>;
     }
 
+    const imageSrc = product.image
+        ? product.image.startsWith('http')
+            ? product.image
+            : `${BASEURL}${product.image}`
+        : 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=900&q=80';
+
     const handleAddToCart = () => {
-        if(!localStorage.getItem("access_token")){
-            alert("Please login to add items to the cart.");
+        if (!localStorage.getItem('access_token')) {
+            alert('Please login to add items to the cart.');
+            navigate('/login');
             return;
         }
-        addToCart(product.id);  
+        addToCart(product.id);
     };
 
     return (
-        <div className="min-h-screen bg-gray-100 flex justify-center items-center py-10">
-            <div className="bg-white shadow-lg rounded-2xl p-8 max-w-3xl w-full">
-                <div className="flex flex-col md:flex-row gap-8">
-                    <img
-                        src={`${product.image}`}
-                        alt={product.name}
-                        className="w-full md:w-1/2 h-auto rounded-lg object-cover"
-                    />
-                    <div className="flex-1">
-                        <h1 className="text-3xl font-bold text-gray-800 mb-2">{product.name}</h1>
-                        <p className="text-gray-600 leading-relaxed">{product.description}</p>
-                        <p className="text-xl text-green-600 font-semibold mb-4">${product.price}</p>
-                        <button onClick={handleAddToCart} className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition duration-300">
-                            Add to Cart 🛒
-                        </button>
-                        {/* Home button */}
-                        <div className="mt-4">
-                            <a href="/" className="text-blue-500 hover:underline">Back to Home</a>
+        <div className="min-h-screen bg-slate-100 py-12">
+            <div className="mx-auto max-w-6xl px-6">
+                <Link to="/" className="mb-6 inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                    ← Back to shop
+                </Link>
+
+                <div className="overflow-hidden rounded-3xl bg-white shadow-lg">
+                    <div className="grid gap-8 md:grid-cols-2">
+                        <div className="p-6 md:p-8">
+                            <img
+                                src={imageSrc}
+                                alt={product.name}
+                                className="h-full min-h-[360px] w-full rounded-2xl object-cover"
+                            />
+                        </div>
+
+                        <div className="flex flex-col justify-center p-6 md:p-10">
+                            <span className="mb-3 inline-flex w-fit rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                                {product.category?.name || 'Featured'}
+                            </span>
+                            <h1 className="text-3xl font-black text-slate-900 md:text-4xl">{product.name}</h1>
+                            <p className="mt-4 text-xl font-bold text-slate-900">${Number(product.price || 0).toFixed(2)}</p>
+                            <p className="mt-5 text-base leading-relaxed text-slate-600">{product.description}</p>
+
+                            <div className="mt-8 flex flex-wrap gap-4">
+                                <button
+                                    onClick={handleAddToCart}
+                                    className="rounded-xl bg-indigo-600 px-6 py-3 text-base font-semibold text-white transition hover:bg-indigo-700"
+                                >
+                                    Add to Cart
+                                </button>
+                                <Link
+                                    to="/cart"
+                                    className="rounded-xl border border-slate-200 px-6 py-3 text-base font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                                >
+                                    View cart
+                                </Link>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div> 
+        </div>
     );
 }
 

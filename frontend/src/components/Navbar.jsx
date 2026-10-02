@@ -6,7 +6,6 @@ function Navbar() {
     const { cartItems } = useCart();
     const navigate = useNavigate();
     const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
-
     const isLoggedIn = !!getAccessToken();
 
     const handleLogout = () => {
@@ -15,35 +14,32 @@ function Navbar() {
     };
 
     return (
-        <nav className="bg-white shadow-md px-6 py-4 flex justify-between items-center fixed w-full top-0 z-50">
-            <Link to="/" className="text-2xl font-bold text-gray-800">
-                🛍 VanitaCart
-            </Link>
-            <div className="flex items-center gap-6">
-                {/* LogIn/SignUp or Logout */}
-                {!isLoggedIn ? (
-                    <>
-                        <Link to='/login' className='text-gray-800 hover:text-gray-600 font-mediumn'>
-                            Login
-                        </Link>
-                        <Link to='/signup' className='text-gray-800 hover:text-gray-600 font-mediumn'>
-                            SignUp
-                        </Link>
-                    </>
-                ) : (
-                    <button onClick={handleLogout} className="text-gray-800 hover:text-gray-600 font-medium">
-                        Logout
-                    </button>
-                )}
+        <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-sm">
+            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
+                <Link to="/" className="text-2xl font-black tracking-tight text-slate-900">
+                    🛍 VanitaCart
+                </Link>
+
+                <div className="flex items-center gap-5 text-sm font-medium text-slate-700">
+                    {!isLoggedIn ? (
+                        <>
+                            <Link to="/login" className="hover:text-slate-900">Login</Link>
+                            <Link to="/signup" className="rounded-full bg-slate-900 px-4 py-2 text-white hover:bg-slate-700">
+                                Sign up
+                            </Link>
+                        </>
+                    ) : (
+                        <button onClick={handleLogout} className="hover:text-slate-900">Logout</button>
+                    )}
+
+                    <Link to="/cart" className="relative inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 hover:border-slate-300">
+                        <span>Cart</span>
+                        <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+                            {cartCount}
+                        </span>
+                    </Link>
+                </div>
             </div>
-
-
-            <Link to="/cart" className="relative text-gray-800 hover:text-gray-600 font-medium">
-                🛒 Cart
-                <span className="absolute -top-2 -right-3 bg-red-500 text-white text-xs font-bold rounded-full px-2">
-                    {cartCount}
-                </span>
-            </Link>
         </nav>
     );
 }

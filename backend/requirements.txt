@@ -1,4 +1,4 @@
-Django==6.1
+Django==5.2.16
 django-cors-headers
 djangorestframework
 djangorestframework-simplejwt

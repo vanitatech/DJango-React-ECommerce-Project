@@ -8,18 +8,19 @@ export const clearTokens = () => {
     localStorage.removeItem("refresh_token");
 };
 
-export const getAccessToken = () => 
-    localStorage.getItem("access_token");
+export const getAccessToken = () => localStorage.getItem("access_token");
 
-
-export const authFetch =  (url, options = {}) => {
+export const authFetch = (url, options = {}) => {
     const token = getAccessToken();
-    const headers = options.headers ? {...options.headers} : {};
-    if (token) { 
-        headers['Authorization'] = `Bearer ${token}`;
-    }   
+    const headers = { ...(options.headers || {}) };
 
-    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+    if (token) {
+        headers['Authorization'] = 'Bearer ' + token;
+    }
 
-    return fetch(url, {...options, headers});
+    if (!headers['Content-Type'] && !(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+    }
+
+    return fetch(url, { ...options, headers });
 };

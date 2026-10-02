@@ -1,7 +1,7 @@
-import {useState} from "react";
-import {useNavigate} from "react-router-dom";
-import {authFetch} from "../utils/auth.js";
-import {useCart } from "../context/CartContext";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCart } from "../context/CartContext";
+import { authFetch } from "../utils/auth.js";
 
 function CheckoutPage() {
     const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
@@ -10,26 +10,24 @@ function CheckoutPage() {
 
     const [form, setForm] = useState({
         name: "",
-        email: "",
+        address: "",
         phone: "",
-        payment_Method: "COD",
+        payment_method: "COD",
     });
 
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState(null);
+    const [message, setMessage] = useState("");
 
-    const handleChange = (e) => {
-        setForm({
-            ...form,
-            [e.target.name]: e.target.value,
-        });
-    }
+    const handleChange = (event) => {
+        const { name, value } = event.target;
+        setForm((previous) => ({ ...previous, [name]: value }));
+    };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async (event) => {
+        event.preventDefault();
         setLoading(true);
         setMessage("");
-        
+
         try {
             const response = await authFetch(`${BASEURL}/api/orders/create/`, {
                 method: "POST",
@@ -42,79 +40,83 @@ function CheckoutPage() {
             const data = await response.json();
 
             if (response.ok) {
-                setMessage("Order placed successfully!");
-                fetch(`${BASEURL}/api/cart/`)
                 clearCart();
-                setTimeout(() => {
-                    navigate("/");
-                }, 2000);
-            } else {
-                setMessage(data.error || "Failed to place order. Please try again.");
+                setMessage("Order placed successfully! Redirecting...");
+                setTimeout(() => navigate("/"), 1500);
+                return;
             }
+
+            setMessage(data.error || "Failed to place order. Please try again.");
         } catch (error) {
-            setMessage("An error occurred. Please try again.");
+            setMessage("An error occurred while placing your order. Please try again.");
+        } finally {
+            setLoading(false);
         }
-    }
+    };
 
     return (
-        <div className="min-h-screen bg-gray-100 flex justify-center items-center p-6">
-            <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-                <h1 className="text-3xl font-bold text-center mb-6">Checkout</h1>
-                
-                
-                <form onSubmit={handleSubmit} className="space-y-4"> 
-                        <input
-                            type="text"
-                            name="name"
-                            placeholder="Full Name"
-                            value={form.name}
-                            onChange={handleChange}
-                            required
-                            className="w-full border rounded-lg p-2"
-                        />
-                        <textarea
-                            name="address"
-                            placeholder="Full Address"
-                            value={form.address}
-                            onChange={handleChange}
-                            required
-                            className="w-full border rounded-lg p-2"
-                        />
-                        <input
-                            type="tel"
-                            name="phone"
-                            placeholder="Phone Number"
-                            value={form.phone}
-                            onChange={handleChange}
-                            required
-                            className="w-full border rounded-lg p-2"
-                        />
-                        <select
-                            name="payment_Method"
-                            value={form.payment_Method}
-                            onChange={handleChange}
-                            className="w-full border rounded-lg p-2"
-                        >
-                            <option value="COD">Cash on Delivery</option>
-                            <option value="Credit Card">Online Payment</option>
-                        </select>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-600 transition duration-300"
-                        >
-                            {loading ? "Processing..." : "Place Order"}
-                        </button>
-                    {message && 
-                    <p className="text-center text-green-700 font-semibold mt-4">{message}</p>}
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+            <div className="w-full max-w-xl rounded-3xl bg-white p-8 shadow-lg">
+                <h1 className="mb-6 text-center text-3xl font-black text-slate-900">Checkout</h1>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <input
+                        type="text"
+                        name="name"
+                        value={form.name}
+                        onChange={handleChange}
+                        placeholder="Full name"
+                        required
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500"
+                    />
+
+                    <textarea
+                        name="address"
+                        value={form.address}
+                        onChange={handleChange}
+                        placeholder="Shipping address"
+                        required
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500"
+                        rows="4"
+                    />
+
+                    <input
+                        type="tel"
+                        name="phone"
+                        value={form.phone}
+                        onChange={handleChange}
+                        placeholder="Phone number"
+                        required
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500"
+                    />
+
+                    <select
+                        name="payment_method"
+                        value={form.payment_method}
+                        onChange={handleChange}
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500"
+                    >
+                        <option value="COD">Cash on delivery</option>
+                        <option value="CARD">Credit card</option>
+                    </select>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-base font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+                    >
+                        {loading ? 'Processing...' : 'Place order'}
+                    </button>
                 </form>
 
+                {message && (
+                    <p className={`mt-4 text-center text-sm font-medium ${message.startsWith('Order placed') ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {message}
+                    </p>
+                )}
             </div>
-                    
         </div>
-    )
+    );
 }
 
 export default CheckoutPage;
-
-
