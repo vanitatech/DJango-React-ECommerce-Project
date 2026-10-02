@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "../context/CartContext";
+import { useCart } from "../context/useCart.js";
 import { authFetch } from "../utils/auth.js";
 
 function CheckoutPage() {
@@ -41,13 +41,13 @@ function CheckoutPage() {
 
             if (response.ok) {
                 clearCart();
-                setMessage("Order placed successfully! Redirecting...");
-                setTimeout(() => navigate("/"), 1500);
+                setMessage(`Order #${data.order_id} placed successfully! Redirecting to your orders...`);
+                setTimeout(() => navigate("/orders"), 1500);
                 return;
             }
 
             setMessage(data.error || "Failed to place order. Please try again.");
-        } catch (error) {
+        } catch {
             setMessage("An error occurred while placing your order. Please try again.");
         } finally {
             setLoading(false);
@@ -97,7 +97,7 @@ function CheckoutPage() {
                         className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500"
                     >
                         <option value="COD">Cash on delivery</option>
-                        <option value="CARD">Credit card</option>
+                        <option value="CARD">Card (demo only; no payment processed)</option>
                     </select>
 
                     <button

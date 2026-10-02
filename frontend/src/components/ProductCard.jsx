@@ -2,9 +2,11 @@ import { Link } from 'react-router-dom';
 
 function ProductCard({ product }) {
     const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
-    const imageSrc = product.image
-        ? `${BASEURL}${product.image}`
-        : 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=900&q=80';
+    const imageSrc = product.external_image_url || (product.image
+        ? product.image.startsWith('http')
+            ? product.image
+            : `${BASEURL}${product.image}`
+        : 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=900&q=80');
 
     return (
         <Link to={`/product/${product.id}`} className="group block h-full">
@@ -22,14 +24,18 @@ function ProductCard({ product }) {
                         <span className="rounded-full bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700">
                             {product.category?.name || 'General'}
                         </span>
-                        <span className="text-xs font-medium text-emerald-600">In stock</span>
+                        <span className={`text-xs font-medium ${product.stock_quantity > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {product.stock_quantity > 0 ? `${product.stock_quantity} in stock` : 'Out of stock'}
+                        </span>
                     </div>
 
                     <h2 className="text-lg font-semibold text-slate-800">{product.name}</h2>
                     <p className="line-clamp-2 text-sm text-slate-600">{product.description || 'Premium quality product ready for everyday use.'}</p>
                     <div className="flex items-center justify-between pt-2">
                         <p className="text-xl font-bold text-slate-900">${Number(product.price || 0).toFixed(2)}</p>
-                        <span className="text-sm font-medium text-indigo-600">View item →</span>
+                        <span className="text-sm font-medium text-indigo-600">
+                            {product.review_count ? `★ ${product.average_rating} (${product.review_count})` : 'No reviews'}
+                        </span>
                     </div>
                 </div>
             </div>

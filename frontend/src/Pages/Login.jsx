@@ -34,7 +34,7 @@ function Login() {
             else {
                 setMsg(data.detail || 'Login failed. Please try again.');
             }
-        } catch (error) {
+        } catch {
             setMsg('An error occurred. Please try again later.');
         }
     };

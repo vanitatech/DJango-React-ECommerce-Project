@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from .models import Cart, CartItem, Category, Product
+from .models import Cart, CartItem, Category, Order, OrderItem, Product, Review
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -12,10 +12,21 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
+    average_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = "__all__"
+
+    def get_average_rating(self, product):
+        ratings = [review.rating for review in product.reviews.all()]
+        if not ratings:
+            return None
+        return round(sum(ratings) / len(ratings), 1)
+
+    def get_review_count(self, product):
+        return len(product.reviews.all())
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -24,10 +35,23 @@ class CartItemSerializer(serializers.ModelSerializer):
         source="product.price", max_digits=10, decimal_places=2, read_only=True
     )
     product_image = serializers.ImageField(source="product.image", read_only=True)
+    product_external_image_url = serializers.URLField(
+        source="product.external_image_url", read_only=True
+    )
+    product_stock = serializers.IntegerField(source="product.stock_quantity", read_only=True)
 
     class Meta:
         model = CartItem
-        fields = ["id", "quantity", "product", "product_name", "product_price", "product_image"]
+        fields = [
+            "id",
+            "quantity",
+            "product",
+            "product_name",
+            "product_price",
+            "product_image",
+            "product_external_image_url",
+            "product_stock",
+        ]
 
 
 class CartSerializer(serializers.ModelSerializer):
@@ -37,6 +61,46 @@ class CartSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cart
         fields = ["id", "user", "created_at", "items", "total"]
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = Review
+        fields = ["id", "username", "rating", "comment", "created_at", "updated_at"]
+        read_only_fields = ["id", "username", "created_at", "updated_at"]
+
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderItem
+        fields = ["id", "product", "product_name", "quantity", "price"]
+        read_only_fields = fields
+
+    def get_product_name(self, item):
+        return item.product_name or item.product.name
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    items = OrderItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            "id",
+            "created_at",
+            "total_amount",
+            "customer_name",
+            "shipping_address",
+            "phone",
+            "payment_method",
+            "status",
+            "items",
+        ]
+        read_only_fields = fields
 
 
 class UserSerializer(serializers.ModelSerializer):

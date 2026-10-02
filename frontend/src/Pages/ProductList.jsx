@@ -67,6 +67,19 @@ function ProductList() {
             .sort(sorters[sortBy] || sorters.newest);
     }, [products, searchTerm, selectedCategory, sortBy]);
 
+    const reviewSummary = useMemo(() => {
+        const reviewedProducts = products.filter((product) => product.review_count > 0);
+        const reviewCount = reviewedProducts.reduce((count, product) => count + product.review_count, 0);
+        const ratingTotal = reviewedProducts.reduce(
+            (total, product) => total + product.average_rating * product.review_count,
+            0
+        );
+        return {
+            count: reviewCount,
+            rating: reviewCount ? (ratingTotal / reviewCount).toFixed(1) : "New",
+        };
+    }, [products]);
+
     if (loading) {
         return (
             <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-600">
@@ -113,7 +126,10 @@ function ProductList() {
                                 </div>
                                 <div className="rounded-2xl bg-white/10 p-4">
                                     <p className="text-xs uppercase tracking-[0.2em] text-indigo-200">Rating</p>
-                                    <p className="mt-2 text-3xl font-bold">4.9</p>
+                                    <p className="mt-2 text-3xl font-bold">{reviewSummary.rating}</p>
+                                    <p className="mt-1 text-xs text-indigo-200">
+                                        {reviewSummary.count ? `${reviewSummary.count} customer reviews` : "First reviews welcome"}
+                                    </p>
                                 </div>
                             </div>
                         </div>

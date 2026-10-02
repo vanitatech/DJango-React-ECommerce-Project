@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useCart } from "../context/CartContext";
+import { useCart } from "../context/useCart.js";
 
 function CartPage() {
     const { cartItems, total, removeFromCart, updateQuantity } = useCart();
@@ -23,9 +23,13 @@ function CartPage() {
                             {cartItems.map((item) => (
                                 <div key={item.id} className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between">
                                     <div className="flex items-center gap-4">
-                                        {item.product_image ? (
+                                        {item.product_external_image_url || item.product_image ? (
                                             <img
-                                                src={`${BASEURL}${item.product_image}`}
+                                                src={item.product_external_image_url || (
+                                                    item.product_image.startsWith("http")
+                                                        ? item.product_image
+                                                        : `${BASEURL}${item.product_image}`
+                                                )}
                                                 alt={item.product_name}
                                                 className="h-20 w-20 rounded-xl object-cover"
                                             />
@@ -54,6 +58,7 @@ function CartPage() {
                                             className="h-9 w-9 rounded-full bg-slate-200 font-bold text-slate-700 hover:bg-slate-300"
                                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
                                             aria-label="Increase quantity"
+                                            disabled={item.quantity >= item.product_stock}
                                         >
                                             +
                                         </button>
@@ -64,6 +69,9 @@ function CartPage() {
                                             Remove
                                         </button>
                                     </div>
+                                    {item.quantity >= item.product_stock && (
+                                        <p className="text-xs text-amber-700">Maximum available quantity reached.</p>
+                                    )}
                                 </div>
                             ))}
                         </div>

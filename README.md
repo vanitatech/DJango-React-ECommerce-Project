@@ -40,9 +40,13 @@ This app demonstrates:
 - JWT access and refresh token flow
 - Product list with search, filtering, and sorting
 - Product detail page
+- Customer reviews with one review per account and aggregate ratings
 - Cart with quantity updates and removal
+- Stock-aware inventory and checkout validation
 - Protected checkout flow
-- Order creation with validation
+- Order creation with validation and order history
+- Django admin inventory and order-status management
+- Demo catalog seeding with distinct product imagery
 - Responsive storefront UI for mobile and desktop
 
 ## Project structure
@@ -65,6 +69,8 @@ DJango-React-ECommerce-Project/
 ```
 
 ## Local development
+
+Requirements: Python 3.10+ and Node.js 22.12+.
 
 ### 1) Backend
 
@@ -105,6 +111,8 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 /api/cart/remove/
 /api/cart/update/
 /api/orders/create/
+/api/orders/
+/api/products/<id>/reviews/
 ```
 
 ## What I improved in this version
@@ -114,18 +122,16 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 - Added better product filters and storefront polish
 - Improved responsive product browsing experience
 - Added SQLite fallback so local development works without a Postgres instance
+- Added stock tracking, order history, and product reviews
 - Strengthened the project story for portfolio and recruiter review
 
 ## Recommended next enhancements
 
-- Add product reviews and ratings
-- Add admin dashboard for managing inventory
-- Implement order history and profile pages
+- Add a customer profile page and order cancellation workflow
 - Add payment integration
-- Add tests for auth, cart, and checkout flows
+- Expand test coverage for authentication and frontend user journeys
 - Add deployment config for Docker or AWS
 
 ## License
 
 This project is intended for learning and portfolio use.
-

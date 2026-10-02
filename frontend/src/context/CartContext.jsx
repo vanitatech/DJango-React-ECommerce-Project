@@ -1,17 +1,14 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { authFetch, getAccessToken } from '../utils/auth';
-
-const CartContext = createContext();
+import CartContext from './CartContextValue';
 
 export const CartProvider = ({ children }) => {
     const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
     const [cartItems, setCartItems] = useState([]);
     const [total, setTotal] = useState(0);
 
-    const fetchCart = async () => {
+    const fetchCart = useCallback(async () => {
         if (!getAccessToken()) {
-            setCartItems([]);
-            setTotal(0);
             return;
         }
 
@@ -28,22 +25,28 @@ export const CartProvider = ({ children }) => {
             setCartItems([]);
             setTotal(0);
         }
-    };
+    }, [BASEURL]);
 
     useEffect(() => {
-        fetchCart();
-    }, [BASEURL]);
+        void Promise.resolve().then(fetchCart);
+    }, [fetchCart]);
 
     const addToCart = async (productId) => {
         try {
-            await authFetch(`${BASEURL}/api/cart/add/`, {
+            const response = await authFetch(`${BASEURL}/api/cart/add/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ product_id: productId }),
             });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Unable to add product to cart');
+            }
             await fetchCart();
+            return data;
         } catch (error) {
             console.error('Error adding to cart:', error);
+            throw error;
         }
     };
 
@@ -89,5 +92,3 @@ export const CartProvider = ({ children }) => {
         </CartContext.Provider>
     );
 };
-
-export const useCart = () => useContext(CartContext);

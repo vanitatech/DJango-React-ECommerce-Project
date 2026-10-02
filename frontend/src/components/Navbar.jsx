@@ -1,15 +1,16 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useCart } from "../context/CartContext.jsx";
+import { useCart } from "../context/useCart.js";
 import { clearTokens, getAccessToken } from "../utils/auth.js";
 
 function Navbar() {
-    const { cartItems } = useCart();
+    const { cartItems, clearCart } = useCart();
     const navigate = useNavigate();
     const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
     const isLoggedIn = !!getAccessToken();
 
     const handleLogout = () => {
         clearTokens();
+        clearCart();
         navigate('/login');
     };
 
@@ -29,7 +30,10 @@ function Navbar() {
                             </Link>
                         </>
                     ) : (
-                        <button onClick={handleLogout} className="hover:text-slate-900">Logout</button>
+                        <>
+                            <Link to="/orders" className="hover:text-slate-900">Orders</Link>
+                            <button onClick={handleLogout} className="hover:text-slate-900">Logout</button>
+                        </>
                     )}
 
                     <Link to="/cart" className="relative inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 hover:border-slate-300">

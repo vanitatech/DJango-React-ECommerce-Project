@@ -1,17 +1,19 @@
-from django.contrib.auth.models import User
 from django.http import JsonResponse
+from django.db import IntegrityError, transaction
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Cart, CartItem, Category, Order, OrderItem, Product
+from .models import Cart, CartItem, Category, Order, OrderItem, Product, Review
 from .serializers import (
     CartItemSerializer,
     CartSerializer,
     CategorySerializer,
+    OrderSerializer,
     ProductSerializer,
     RegisterSerializer,
+    ReviewSerializer,
     UserSerializer,
 )
 
@@ -22,7 +24,7 @@ def home(request):
 
 @api_view(["GET"])
 def get_products(request):
-    products = Product.objects.select_related("category").all()
+    products = Product.objects.select_related("category").prefetch_related("reviews").all()
     query = request.query_params.get("search", "").strip()
     category = request.query_params.get("category")
 
@@ -40,7 +42,7 @@ def get_products(request):
 @api_view(["GET"])
 def get_product(request, pk):
     try:
-        product = Product.objects.select_related("category").get(id=pk)
+        product = Product.objects.select_related("category").prefetch_related("reviews").get(id=pk)
         serializer = ProductSerializer(product, context={"request": request})
         return Response(serializer.data)
     except Product.DoesNotExist:
@@ -77,9 +79,15 @@ def add_to_cart(request):
     cart, _ = Cart.objects.get_or_create(user=request.user)
     item, created = CartItem.objects.get_or_create(cart=cart, product=product)
 
+    next_quantity = 1 if created else item.quantity + 1
+    if next_quantity > product.stock_quantity:
+        if created:
+            item.delete()
+        return Response({"error": "There is not enough stock for this product."}, status=400)
+
     if not created:
-        item.quantity += 1
-        item.save()
+        item.quantity = next_quantity
+        item.save(update_fields=["quantity"])
 
     return Response({"message": "Product added to cart", "cart": CartSerializer(cart).data})
 
@@ -107,6 +115,12 @@ def update_cart_quantity(request):
         item.delete()
         return Response({"message": "Item removed from cart"}, status=200)
 
+    if next_quantity > item.product.stock_quantity:
+        return Response(
+            {"error": f"Only {item.product.stock_quantity} units are currently available."},
+            status=400,
+        )
+
     item.quantity = next_quantity
     item.save()
     return Response(CartItemSerializer(item).data)
@@ -128,6 +142,7 @@ def remove_from_cart(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def create_order(request):
     data = request.data
     name = (data.get("name") or "").strip()
@@ -141,24 +156,51 @@ def create_order(request):
     if not phone.isdigit() or len(phone) < 8:
         return Response({"error": "Invalid phone number."}, status=400)
 
+    if payment_method not in Order.PaymentMethod.values:
+        return Response({"error": "Invalid payment method."}, status=400)
+
     cart, _ = Cart.objects.get_or_create(user=request.user)
-    if not cart.items.exists():
+    cart_items = list(cart.items.select_related("product").all())
+    if not cart_items:
         return Response({"error": "Cart is empty"}, status=400)
 
-    total = sum(item.product.price * item.quantity for item in cart.items.all())
+    locked_products = {}
+    for item in cart_items:
+        product = Product.objects.select_for_update().get(pk=item.product_id)
+        if item.quantity > product.stock_quantity:
+            return Response(
+                {
+                    "error": (
+                        f"Only {product.stock_quantity} units of {product.name} "
+                        "are currently available."
+                    )
+                },
+                status=400,
+            )
+        locked_products[product.pk] = product
+
+    total = sum(locked_products[item.product_id].price * item.quantity for item in cart_items)
 
     order = Order.objects.create(
         user=request.user,
         total_amount=total,
+        customer_name=name,
+        shipping_address=address,
+        phone=phone,
+        payment_method=payment_method,
     )
 
-    for item in cart.items.all():
+    for item in cart_items:
+        product = locked_products[item.product_id]
         OrderItem.objects.create(
             order=order,
-            product=item.product,
+            product=product,
+            product_name=product.name,
             quantity=item.quantity,
-            price=item.product.price,
+            price=product.price,
         )
+        product.stock_quantity -= item.quantity
+        product.save(update_fields=["stock_quantity"])
 
     cart.items.all().delete()
 
@@ -168,9 +210,61 @@ def create_order(request):
             "order_id": order.id,
             "total": float(total),
             "payment_method": payment_method,
-            "customer_name": name,
-            "shipping_address": address,
+            "status": order.status,
         },
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_orders(request):
+    orders = (
+        Order.objects.filter(user=request.user)
+        .prefetch_related("items")
+        .order_by("-created_at")
+    )
+    return Response(OrderSerializer(orders, many=True).data)
+
+
+@api_view(["GET", "POST"])
+def product_reviews(request, pk):
+    try:
+        product = Product.objects.get(pk=pk)
+    except Product.DoesNotExist:
+        return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        reviews = Review.objects.filter(product=product).select_related("user")
+        return Response(ReviewSerializer(reviews, many=True).data)
+
+    if not request.user.is_authenticated:
+        return Response(
+            {"detail": "Authentication credentials were not provided."},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if Review.objects.filter(product=product, user=request.user).exists():
+        return Response(
+            {"error": "You have already reviewed this product."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    serializer = ReviewSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        with transaction.atomic():
+            review = serializer.save(product=product, user=request.user)
+    except IntegrityError:
+        return Response(
+            {"error": "You have already reviewed this product."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    return Response(
+        ReviewSerializer(review).data,
         status=status.HTTP_201_CREATED,
     )
 
