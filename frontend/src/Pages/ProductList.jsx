@@ -1,16 +1,40 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import ProductCard from "../components/ProductCard.jsx";
 
 function ProductList() {
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
-    const [selectedCategory, setSelectedCategory] = useState("all");
-    const [searchTerm, setSearchTerm] = useState("");
-    const [sortBy, setSortBy] = useState("newest");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const searchTerm = searchParams.get("q") || "";
+    const selectedCategory = searchParams.get("category") || "all";
+    const sortOptions = ["newest", "lowToHigh", "highToLow", "name"];
+    const requestedSort = searchParams.get("sort");
+    const sortBy = sortOptions.includes(requestedSort) ? requestedSort : "newest";
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const BASE_URL = import.meta.env.VITE_DJANGO_BASE_URL;
+
+    const updateFilter = (name, value, replace = false) => {
+        setSearchParams((currentParams) => {
+            const nextParams = new URLSearchParams(currentParams);
+            if (value) {
+                nextParams.set(name, value);
+            } else {
+                nextParams.delete(name);
+            }
+            return nextParams;
+        }, { replace });
+    };
+
+    const clearFilters = () => {
+        setSearchParams((currentParams) => {
+            const nextParams = new URLSearchParams(currentParams);
+            ["q", "category", "sort"].forEach((filter) => nextParams.delete(filter));
+            return nextParams;
+        });
+    };
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -143,14 +167,16 @@ function ProductList() {
                         <input
                             type="text"
                             value={searchTerm}
-                            onChange={(event) => setSearchTerm(event.target.value)}
+                            onChange={(event) => updateFilter("q", event.target.value, true)}
                             placeholder="Search products..."
+                            aria-label="Search products"
                             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none ring-0 transition focus:border-indigo-400 focus:bg-white md:max-w-xs"
                         />
 
                         <select
                             value={selectedCategory}
-                            onChange={(event) => setSelectedCategory(event.target.value)}
+                            onChange={(event) => updateFilter("category", event.target.value === "all" ? "" : event.target.value)}
+                            aria-label="Filter by category"
                             className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:bg-white"
                         >
                             <option value="all">All categories</option>
@@ -164,7 +190,8 @@ function ProductList() {
 
                     <select
                         value={sortBy}
-                        onChange={(event) => setSortBy(event.target.value)}
+                        onChange={(event) => updateFilter("sort", event.target.value === "newest" ? "" : event.target.value)}
+                        aria-label="Sort products"
                         className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:bg-white"
                     >
                         <option value="newest">Newest arrivals</option>
@@ -176,7 +203,18 @@ function ProductList() {
 
                 <div className="mb-6 flex items-center justify-between">
                     <h2 className="text-2xl font-bold">Featured items</h2>
-                    <span className="text-sm text-slate-500">{filteredProducts.length} results</span>
+                    <div className="flex items-center gap-4">
+                        <span className="text-sm text-slate-500">{filteredProducts.length} results</span>
+                        {(searchTerm || selectedCategory !== "all" || sortBy !== "newest") && (
+                            <button
+                                type="button"
+                                onClick={clearFilters}
+                                className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+                            >
+                                Clear filters
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {filteredProducts.length > 0 ? (
