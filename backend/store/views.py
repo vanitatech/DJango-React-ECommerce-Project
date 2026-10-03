@@ -20,6 +20,7 @@ from .serializers import (
     CartItemSerializer,
     CartSerializer,
     CategorySerializer,
+    GuestOrderItemSerializer,
     OrderSerializer,
     ProductSerializer,
     RegisterSerializer,
@@ -175,14 +176,27 @@ def remove_from_cart(request):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 @transaction.atomic
 def create_order(request):
     data = request.data
-    name = (data.get("name") or "").strip()
-    address = (data.get("address") or "").strip()
-    phone = (data.get("phone") or "").strip()
+    try:
+        name = serializers.CharField(max_length=150).run_validation(data.get("name"))
+        address = serializers.CharField().run_validation(data.get("address"))
+        phone = serializers.CharField(max_length=30).run_validation(data.get("phone"))
+    except serializers.ValidationError:
+        return Response(
+            {"error": "Name, address, and phone number are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     payment_method = data.get("payment_method") or data.get("payment_Method") or "COD"
+    email = data.get("email", "")
+    if email:
+        try:
+            email = serializers.EmailField().run_validation(email)
+        except serializers.ValidationError:
+            return Response({"error": "Enter a valid email address."}, status=400)
 
     if not name or not address or not phone:
         return Response({"error": "Name, address, and phone number are required."}, status=400)
@@ -190,18 +204,53 @@ def create_order(request):
     if not phone.isdigit() or len(phone) < 8:
         return Response({"error": "Invalid phone number."}, status=400)
 
+    if not request.user.is_authenticated and not email:
+        return Response({"error": "An email address is required for guest checkout."}, status=400)
+
     if payment_method not in Order.PaymentMethod.values:
         return Response({"error": "Invalid payment method."}, status=400)
 
-    cart, _ = Cart.objects.get_or_create(user=request.user)
-    cart_items = list(cart.items.select_related("product").all())
-    if not cart_items:
-        return Response({"error": "Cart is empty"}, status=400)
+    cart = None
+    if request.user.is_authenticated:
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart_items = list(cart.items.all())
+        if not cart_items:
+            return Response({"error": "Cart is empty"}, status=400)
+        quantities = {}
+        for item in cart_items:
+            quantities[item.product_id] = quantities.get(item.product_id, 0) + item.quantity
+    else:
+        item_serializer = serializers.ListSerializer(
+            child=GuestOrderItemSerializer(),
+            data=data.get("items"),
+            allow_empty=False,
+        )
+        if not item_serializer.is_valid():
+            return Response(
+                {"error": "Provide cart items with valid products and positive quantities."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        guest_items = item_serializer.validated_data
+        product_ids = [item["product_id"] for item in guest_items]
+        if len(product_ids) != len(set(product_ids)):
+            return Response(
+                {"error": "Each product may only appear once in the guest cart."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        quantities = {item["product_id"]: item["quantity"] for item in guest_items}
 
-    locked_products = {}
-    for item in cart_items:
-        product = Product.objects.select_for_update().get(pk=item.product_id)
-        if item.quantity > product.stock_quantity:
+    locked_products = {
+        product.pk: product
+        for product in Product.objects.select_for_update()
+        .filter(pk__in=sorted(quantities))
+        .order_by("pk")
+    }
+    if len(locked_products) != len(quantities):
+        return Response({"error": "A product in your cart is no longer available."}, status=400)
+
+    for product_id, quantity in quantities.items():
+        product = locked_products[product_id]
+        if quantity > product.stock_quantity:
             return Response(
                 {
                     "error": (
@@ -211,32 +260,36 @@ def create_order(request):
                 },
                 status=400,
             )
-        locked_products[product.pk] = product
 
-    total = sum(locked_products[item.product_id].price * item.quantity for item in cart_items)
+    total = sum(
+        locked_products[product_id].price * quantity
+        for product_id, quantity in quantities.items()
+    )
 
     order = Order.objects.create(
-        user=request.user,
+        user=request.user if request.user.is_authenticated else None,
         total_amount=total,
         customer_name=name,
+        customer_email=email or (request.user.email if request.user.is_authenticated else ""),
         shipping_address=address,
         phone=phone,
         payment_method=payment_method,
     )
 
-    for item in cart_items:
-        product = locked_products[item.product_id]
+    for product_id, quantity in quantities.items():
+        product = locked_products[product_id]
         OrderItem.objects.create(
             order=order,
             product=product,
             product_name=product.name,
-            quantity=item.quantity,
+            quantity=quantity,
             price=product.price,
         )
-        product.stock_quantity -= item.quantity
+        product.stock_quantity -= quantity
         product.save(update_fields=["stock_quantity"])
 
-    cart.items.all().delete()
+    if cart is not None:
+        cart.items.all().delete()
 
     return Response(
         {

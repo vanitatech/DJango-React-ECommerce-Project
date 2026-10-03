@@ -117,6 +117,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "created_at",
             "total_amount",
             "customer_name",
+            "customer_email",
             "shipping_address",
             "phone",
             "payment_method",
@@ -124,6 +125,11 @@ class OrderSerializer(serializers.ModelSerializer):
             "items",
         ]
         read_only_fields = fields
+
+
+class GuestOrderItemSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField(min_value=1)
+    quantity = serializers.IntegerField(min_value=1)
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

@@ -4,7 +4,7 @@ import { useCart } from "../context/useCart.js";
 import { clearTokens, getAccessToken } from "../utils/auth.js";
 
 function Navbar() {
-    const { cartItems, clearCart } = useCart();
+    const { cartItems } = useCart();
     const navigate = useNavigate();
     const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
     const [isLoggedIn, setIsLoggedIn] = useState(() => !!getAccessToken());
@@ -21,7 +21,6 @@ function Navbar() {
 
     const handleLogout = () => {
         clearTokens();
-        clearCart();
         navigate('/login');
     };
 

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework.test import APITestCase
@@ -78,6 +80,105 @@ class StoreFeatureTests(APITestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 4)
         self.assertTrue(cart.items.exists())
+
+    def test_guest_checkout_creates_order_using_server_product_prices(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.post(
+            reverse("create_order"),
+            {
+                "name": "Guest Shopper",
+                "email": "guest@example.com",
+                "address": "10 Market Street",
+                "phone": "0123456789",
+                "items": [
+                    {
+                        "product_id": self.product.id,
+                        "quantity": 2,
+                        "price": "0.01",
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        order = Order.objects.get(pk=response.data["order_id"])
+        item = order.items.get()
+        self.product.refresh_from_db()
+        self.assertIsNone(order.user)
+        self.assertEqual(order.customer_email, "guest@example.com")
+        self.assertEqual(order.total_amount, Decimal("50.00"))
+        self.assertEqual(item.price, Decimal("25.00"))
+        self.assertEqual(item.quantity, 2)
+        self.assertEqual(self.product.stock_quantity, 2)
+
+    def test_guest_checkout_requires_email_and_valid_cart_items(self):
+        self.client.force_authenticate(user=None)
+        payload = {
+            "name": "Guest Shopper",
+            "address": "10 Market Street",
+            "phone": "0123456789",
+            "items": [{"product_id": self.product.id, "quantity": 1}],
+        }
+
+        missing_email_response = self.client.post(
+            reverse("create_order"), payload, format="json"
+        )
+        invalid_email_response = self.client.post(
+            reverse("create_order"),
+            {**payload, "email": "not-an-email"},
+            format="json",
+        )
+        invalid_items_response = self.client.post(
+            reverse("create_order"),
+            {
+                **payload,
+                "email": "guest@example.com",
+                "items": [{"product_id": self.product.id, "quantity": 0}],
+            },
+            format="json",
+        )
+        duplicate_items_response = self.client.post(
+            reverse("create_order"),
+            {
+                **payload,
+                "email": "guest@example.com",
+                "items": [
+                    {"product_id": self.product.id, "quantity": 1},
+                    {"product_id": self.product.id, "quantity": 1},
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(missing_email_response.status_code, 400)
+        self.assertEqual(invalid_email_response.status_code, 400)
+        self.assertEqual(invalid_items_response.status_code, 400)
+        self.assertEqual(duplicate_items_response.status_code, 400)
+        self.assertEqual(Order.objects.count(), 0)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 4)
+
+    def test_guest_checkout_rejects_insufficient_stock_without_order(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.post(
+            reverse("create_order"),
+            {
+                "name": "Guest Shopper",
+                "email": "guest@example.com",
+                "address": "10 Market Street",
+                "phone": "0123456789",
+                "items": [{"product_id": self.product.id, "quantity": 5}],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Order.objects.count(), 0)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 4)
 
     def test_cart_cannot_exceed_available_stock(self):
         cart = Cart.objects.create(user=self.user)

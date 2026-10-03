@@ -60,6 +60,7 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     customer_name = models.CharField(max_length=150, blank=True)
+    customer_email = models.EmailField(blank=True)
     shipping_address = models.TextField(blank=True)
     phone = models.CharField(max_length=30, blank=True)
     payment_method = models.CharField(
@@ -144,7 +145,6 @@ class CartItem(models.Model):
     @property
     def subtotal(self):
         return self.quantity * self.product.price
-
 
 
 

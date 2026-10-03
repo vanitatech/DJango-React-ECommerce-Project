@@ -1,9 +1,15 @@
 import {useState} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {useNavigate, useSearchParams} from 'react-router-dom';
 
 function Signup() {
     const BASE = import.meta.env.VITE_DJANGO_BASE_URL;
-    const [form, setForm] = useState({username: '', password: '', email: '', password2: ''});
+    const [searchParams] = useSearchParams();
+    const [form, setForm] = useState({
+        username: '',
+        password: '',
+        email: searchParams.get('email') || '',
+        password2: '',
+    });
     const [msg, setMsg] = useState('');
     const navigate = useNavigate();
 

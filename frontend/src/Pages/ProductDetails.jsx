@@ -94,11 +94,6 @@ function ProductDetails() {
     }, [id, loadProduct, loadReviews, loadWishlistState]);
 
     const handleAddToCart = async () => {
-        if (!getAccessToken()) {
-            navigate("/login", { state: { from: { pathname: `/product/${id}` } } });
-            return;
-        }
-
         setCartAdding(true);
         setCartMessage("");
         setCartError("");

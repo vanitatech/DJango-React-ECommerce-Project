@@ -1,14 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useCart } from '../context/useCart.js';
-import { getAccessToken } from '../utils/auth.js';
 
 function ProductCard({ product }) {
     const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
-    const location = useLocation();
-    const navigate = useNavigate();
     const { addToCart } = useCart();
-    const [isLoggedIn, setIsLoggedIn] = useState(() => !!getAccessToken());
     const [addingToCart, setAddingToCart] = useState(false);
     const [cartMessage, setCartMessage] = useState('');
     const [cartError, setCartError] = useState('');
@@ -18,22 +14,7 @@ function ProductCard({ product }) {
             : `${BASEURL}${product.image}`
         : 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=900&q=80');
 
-    useEffect(() => {
-        const updateAuthentication = () => setIsLoggedIn(!!getAccessToken());
-        window.addEventListener('auth-change', updateAuthentication);
-        window.addEventListener('storage', updateAuthentication);
-        return () => {
-            window.removeEventListener('auth-change', updateAuthentication);
-            window.removeEventListener('storage', updateAuthentication);
-        };
-    }, []);
-
     const handleAddToCart = async () => {
-        if (!getAccessToken()) {
-            navigate('/login', { state: { from: location } });
-            return;
-        }
-
         setAddingToCart(true);
         setCartMessage('');
         setCartError('');
@@ -86,13 +67,7 @@ function ProductCard({ product }) {
                     disabled={product.stock_quantity < 1 || addingToCart}
                     className="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                    {addingToCart
-                        ? 'Adding...'
-                        : product.stock_quantity < 1
-                            ? 'Out of stock'
-                            : isLoggedIn
-                                ? 'Add to cart'
-                                : 'Sign in to add'}
+                    {addingToCart ? 'Adding...' : product.stock_quantity < 1 ? 'Out of stock' : 'Add to cart'}
                 </button>
                 {cartMessage && <p role="status" className="mt-2 text-center text-xs font-medium text-emerald-700">{cartMessage}</p>}
                 {cartError && <p role="alert" className="mt-2 text-center text-xs font-medium text-red-600">{cartError}</p>}
