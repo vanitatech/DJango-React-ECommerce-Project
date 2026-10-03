@@ -43,6 +43,7 @@ This app demonstrates:
 - Product detail page
 - Customer reviews with one review per account and aggregate ratings
 - Cart with quantity updates and removal
+- Product-page quantity selection with stock-validated cart updates
 - Stock-aware inventory and checkout validation
 - Protected checkout with saved delivery-detail autofill and an order summary
 - Order creation with validation and order history

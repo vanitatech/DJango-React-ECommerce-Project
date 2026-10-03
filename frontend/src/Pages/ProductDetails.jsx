@@ -14,12 +14,16 @@ function ProductDetails() {
     const [reviewMessage, setReviewMessage] = useState("");
     const [reviewSubmitting, setReviewSubmitting] = useState(false);
     const [reviewForm, setReviewForm] = useState({ rating: "5", comment: "" });
+    const [addQuantity, setAddQuantity] = useState(1);
+    const [cartAdding, setCartAdding] = useState(false);
+    const [cartError, setCartError] = useState("");
+    const [cartMessage, setCartMessage] = useState("");
     const [isWishlisted, setIsWishlisted] = useState(false);
     const [wishlistProductId, setWishlistProductId] = useState(null);
     const [wishlistUpdating, setWishlistUpdating] = useState(false);
     const [wishlistError, setWishlistError] = useState("");
     const [wishlistMessage, setWishlistMessage] = useState("");
-    const { addToCart } = useCart();
+    const { addToCart, cartItems } = useCart();
 
     const loadProduct = useCallback(async () => {
         const response = await fetch(`${BASEURL}/api/products/${id}/`);
@@ -89,17 +93,20 @@ function ProductDetails() {
 
     const handleAddToCart = async () => {
         if (!getAccessToken()) {
-            navigate("/login");
+            navigate("/login", { state: { from: { pathname: `/product/${id}` } } });
             return;
         }
 
-        setReviewMessage("");
-        setReviewError("");
+        setCartAdding(true);
+        setCartMessage("");
+        setCartError("");
         try {
-            await addToCart(product.id);
-            setReviewMessage("Added to your cart.");
+            await addToCart(product.id, selectedAddQuantity);
+            setCartMessage(`Added ${selectedAddQuantity} ${selectedAddQuantity === 1 ? "item" : "items"} to your cart.`);
         } catch (cartError) {
-            setReviewError(cartError.message);
+            setCartError(cartError.message);
+        } finally {
+            setCartAdding(false);
         }
     };
 
@@ -183,6 +190,10 @@ function ProductDetails() {
             : `${BASEURL}${product.image}`
         : "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=900&q=80";
     const productImage = product.external_image_url || imageSrc;
+    const productCartItem = cartItems.find((item) => item.product === product.id);
+    const cartQuantity = productCartItem?.quantity || 0;
+    const availableToAdd = Math.max(product.stock_quantity - cartQuantity, 0);
+    const selectedAddQuantity = Math.min(addQuantity, Math.max(availableToAdd, 1));
 
     return (
         <div className="min-h-screen bg-slate-100 py-12">
@@ -204,22 +215,49 @@ function ProductDetails() {
                             <h1 className="text-3xl font-black text-slate-900 md:text-4xl">{product.name}</h1>
                             <p className="mt-4 text-xl font-bold text-slate-900">${Number(product.price || 0).toFixed(2)}</p>
                             <p className="mt-5 text-base leading-relaxed text-slate-600">{product.description}</p>
-                            <p className={`mt-3 text-sm font-medium ${product.stock_quantity > 0 ? "text-emerald-700" : "text-red-600"}`}>
-                                {product.stock_quantity > 0 ? `${product.stock_quantity} available` : "Currently out of stock"}
+                            <p className={`mt-3 text-sm font-medium ${availableToAdd > 0 ? "text-emerald-700" : "text-amber-700"}`}>
+                                {availableToAdd > 0
+                                    ? `${availableToAdd} available to add${cartQuantity ? ` · ${cartQuantity} already in your cart` : ""}`
+                                    : cartQuantity
+                                        ? "All available units are already in your cart"
+                                        : "Currently out of stock"}
                             </p>
 
                             <div className="mt-8 flex flex-wrap gap-4">
+                                <label htmlFor="add-quantity" className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                                    Quantity
+                                    <input
+                                        id="add-quantity"
+                                        type="number"
+                                        min="1"
+                                        max={availableToAdd}
+                                        value={selectedAddQuantity}
+                                        onChange={(event) => {
+                                            const nextQuantity = event.target.valueAsNumber;
+                                            if (Number.isFinite(nextQuantity)) {
+                                                setAddQuantity(Math.max(1, nextQuantity));
+                                            }
+                                        }}
+                                        disabled={availableToAdd < 1 || cartAdding}
+                                        className="w-20 rounded-xl border border-slate-200 px-3 py-3 outline-none focus:border-indigo-500 disabled:bg-slate-100"
+                                    />
+                                </label>
                                 <button
                                     onClick={handleAddToCart}
-                                    disabled={product.stock_quantity < 1}
+                                    disabled={availableToAdd < 1 || cartAdding}
                                     className="rounded-xl bg-indigo-600 px-6 py-3 text-base font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
-                                    Add to Cart
+                                    {cartAdding ? "Adding..." : "Add to Cart"}
                                 </button>
                                 <Link to="/cart" className="rounded-xl border border-slate-200 px-6 py-3 text-base font-semibold text-slate-700 transition hover:bg-slate-50">
                                     View cart
                                 </Link>
                             </div>
+                            {(cartMessage || cartError) && (
+                                <p role={cartError ? "alert" : "status"} className={`mt-3 text-sm ${cartError ? "text-red-600" : "text-emerald-700"}`}>
+                                    {cartError || cartMessage}
+                                </p>
+                            )}
                             <button
                                 type="button"
                                 onClick={handleWishlistToggle}

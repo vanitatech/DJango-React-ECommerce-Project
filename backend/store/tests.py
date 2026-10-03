@@ -91,6 +91,50 @@ class StoreFeatureTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(cart.items.get().quantity, 4)
 
+    def test_cart_add_accepts_quantity_and_accumulates_items(self):
+        url = reverse("cart_add")
+
+        first_response = self.client.post(
+            url,
+            {"product_id": self.product.id, "quantity": 2},
+            format="json",
+        )
+        second_response = self.client.post(
+            url,
+            {"product_id": self.product.id, "quantity": 1},
+            format="json",
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(CartItem.objects.get(product=self.product).quantity, 3)
+
+    def test_cart_add_rejects_invalid_quantity_without_creating_item(self):
+        for quantity in (0, -1, "many", 1.5):
+            with self.subTest(quantity=quantity):
+                response = self.client.post(
+                    reverse("cart_add"),
+                    {"product_id": self.product.id, "quantity": quantity},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertFalse(CartItem.objects.filter(product=self.product).exists())
+
+    def test_cart_add_rejects_quantity_over_stock_without_partial_update(self):
+        cart = Cart.objects.create(user=self.user)
+        item = CartItem.objects.create(cart=cart, product=self.product, quantity=3)
+
+        response = self.client.post(
+            reverse("cart_add"),
+            {"product_id": self.product.id, "quantity": 2},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        item.refresh_from_db()
+        self.assertEqual(item.quantity, 3)
+
     def test_order_history_only_returns_current_users_orders(self):
         own_order = Order.objects.create(
             user=self.user,

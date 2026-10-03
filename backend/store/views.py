@@ -1,6 +1,6 @@
 from django.http import JsonResponse
 from django.db import IntegrityError, transaction
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -77,24 +77,39 @@ def get_cart(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def add_to_cart(request):
     product_id = request.data.get("product_id")
     if not product_id:
         return Response({"error": "Product ID is required"}, status=400)
 
     try:
-        product = Product.objects.get(id=product_id)
+        quantity = serializers.IntegerField(min_value=1).run_validation(
+            request.data.get("quantity", 1)
+        )
+    except serializers.ValidationError:
+        return Response({"error": "Quantity must be a valid positive number."}, status=400)
+
+    try:
+        product = Product.objects.select_for_update().get(id=product_id)
     except Product.DoesNotExist:
         return Response({"error": "Product not found"}, status=404)
 
     cart, _ = Cart.objects.get_or_create(user=request.user)
-    item, created = CartItem.objects.get_or_create(cart=cart, product=product)
+    item, created = CartItem.objects.get_or_create(
+        cart=cart, product=product, defaults={"quantity": quantity}
+    )
 
-    next_quantity = 1 if created else item.quantity + 1
+    existing_quantity = 0 if created else item.quantity
+    next_quantity = existing_quantity + quantity
     if next_quantity > product.stock_quantity:
         if created:
             item.delete()
-        return Response({"error": "There is not enough stock for this product."}, status=400)
+        available_to_add = max(product.stock_quantity - existing_quantity, 0)
+        return Response(
+            {"error": f"Only {available_to_add} units are available to add."},
+            status=400,
+        )
 
     if not created:
         item.quantity = next_quantity
