@@ -65,11 +65,16 @@ class CartSerializer(serializers.ModelSerializer):
 
 class ReviewSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
+    is_owner = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
-        fields = ["id", "username", "rating", "comment", "created_at", "updated_at"]
-        read_only_fields = ["id", "username", "created_at", "updated_at"]
+        fields = ["id", "username", "is_owner", "rating", "comment", "created_at", "updated_at"]
+        read_only_fields = ["id", "username", "is_owner", "created_at", "updated_at"]
+
+    def get_is_owner(self, review):
+        request = self.context.get("request")
+        return bool(request and request.user.is_authenticated and review.user_id == request.user.id)
 
 
 class OrderItemSerializer(serializers.ModelSerializer):

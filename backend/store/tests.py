@@ -172,16 +172,72 @@ class StoreFeatureTests(APITestCase):
 
         self.assertEqual(create_response.status_code, 201)
         self.assertEqual(duplicate_response.status_code, 409)
+        self.assertTrue(create_response.data["is_owner"])
         self.assertEqual(Review.objects.filter(product=self.product, user=self.user).count(), 1)
 
         self.client.force_authenticate(user=None)
         list_response = self.client.get(reverse("product_reviews", args=[self.product.id]))
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(list_response.data[0]["username"], self.user.username)
+        self.assertFalse(list_response.data[0]["is_owner"])
 
         product_response = self.client.get(reverse("product_detail", args=[self.product.id]))
         self.assertEqual(product_response.data["review_count"], 1)
         self.assertEqual(product_response.data["average_rating"], 5.0)
+
+    def test_customer_can_edit_own_product_review(self):
+        review = Review.objects.create(
+            user=self.user,
+            product=self.product,
+            rating=2,
+            comment="Could be better",
+        )
+
+        response = self.client.patch(
+            reverse("product_reviews", args=[self.product.id]),
+            {"rating": 5, "comment": "Much better than expected"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], review.id)
+        self.assertTrue(response.data["is_owner"])
+        self.assertEqual(response.data["rating"], 5)
+        self.assertEqual(response.data["comment"], "Much better than expected")
+        review.refresh_from_db()
+        self.assertEqual(review.rating, 5)
+        self.assertEqual(review.comment, "Much better than expected")
+
+    def test_customer_cannot_edit_another_users_product_review(self):
+        review = Review.objects.create(
+            user=self.other_user,
+            product=self.product,
+            rating=3,
+            comment="Other customer's review",
+        )
+
+        response = self.client.patch(
+            reverse("product_reviews", args=[self.product.id]),
+            {"rating": 1, "comment": "Changed by another user"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        review.refresh_from_db()
+        self.assertEqual(review.rating, 3)
+        self.assertEqual(review.comment, "Other customer's review")
+
+    def test_editing_product_review_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.patch(
+            reverse("product_reviews", args=[self.product.id]),
+            {"rating": 1},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(Review.objects.exists())
 
     def test_product_review_rejects_out_of_range_rating(self):
         response = self.client.post(

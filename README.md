@@ -123,6 +123,7 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 /api/wishlist/
 /api/wishlist/<product_id>/
 /api/products/<id>/reviews/
+# GET/POST/PATCH: public reviews, create a review, or edit your own review
 ```
 
 ## What I improved in this version

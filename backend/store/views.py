@@ -335,7 +335,7 @@ def cancel_order(request, pk):
     return Response(OrderSerializer(order).data)
 
 
-@api_view(["GET", "POST"])
+@api_view(["GET", "POST", "PATCH"])
 def product_reviews(request, pk):
     try:
         product = Product.objects.get(pk=pk)
@@ -344,7 +344,13 @@ def product_reviews(request, pk):
 
     if request.method == "GET":
         reviews = Review.objects.filter(product=product).select_related("user")
-        return Response(ReviewSerializer(reviews, many=True).data)
+        return Response(
+            ReviewSerializer(
+                reviews,
+                many=True,
+                context={"request": request},
+            ).data
+        )
 
     if not request.user.is_authenticated:
         return Response(
@@ -352,13 +358,33 @@ def product_reviews(request, pk):
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
+    if request.method == "PATCH":
+        try:
+            review = Review.objects.get(product=product, user=request.user)
+        except Review.DoesNotExist:
+            return Response(
+                {"error": "You have not reviewed this product."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = ReviewSerializer(
+            review,
+            data=request.data,
+            partial=True,
+            context={"request": request},
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(serializer.data)
+
     if Review.objects.filter(product=product, user=request.user).exists():
         return Response(
             {"error": "You have already reviewed this product."},
             status=status.HTTP_409_CONFLICT,
         )
 
-    serializer = ReviewSerializer(data=request.data)
+    serializer = ReviewSerializer(data=request.data, context={"request": request})
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -372,7 +398,7 @@ def product_reviews(request, pk):
         )
 
     return Response(
-        ReviewSerializer(review).data,
+        ReviewSerializer(review, context={"request": request}).data,
         status=status.HTTP_201_CREATED,
     )
 

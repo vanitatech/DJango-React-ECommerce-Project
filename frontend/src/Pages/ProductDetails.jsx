@@ -13,6 +13,7 @@ function ProductDetails() {
     const [reviewError, setReviewError] = useState("");
     const [reviewMessage, setReviewMessage] = useState("");
     const [reviewSubmitting, setReviewSubmitting] = useState(false);
+    const [editingReview, setEditingReview] = useState(false);
     const [reviewForm, setReviewForm] = useState({ rating: "5", comment: "" });
     const [addQuantity, setAddQuantity] = useState(1);
     const [cartAdding, setCartAdding] = useState(false);
@@ -35,7 +36,7 @@ function ProductDetails() {
 
     const loadReviews = useCallback(async () => {
         try {
-            const response = await fetch(`${BASEURL}/api/products/${id}/reviews/`);
+            const response = await authFetch(`${BASEURL}/api/products/${id}/reviews/`);
             if (!response.ok) {
                 throw new Error("Failed to fetch product reviews");
             }
@@ -115,9 +116,10 @@ function ProductDetails() {
         setReviewSubmitting(true);
         setReviewMessage("");
         setReviewError("");
+        const ownReview = reviews.find((review) => review.is_owner);
         try {
             const response = await authFetch(`${BASEURL}/api/products/${id}/reviews/`, {
-                method: "POST",
+                method: editingReview && ownReview ? "PATCH" : "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     rating: Number(reviewForm.rating),
@@ -129,9 +131,12 @@ function ProductDetails() {
                 throw new Error(data.error || data.detail || "Unable to submit your review.");
             }
 
-            setReviews((previous) => [data, ...previous]);
+            setReviews((previous) => editingReview
+                ? previous.map((review) => review.id === data.id ? data : review)
+                : [data, ...previous]);
             setReviewForm({ rating: "5", comment: "" });
-            setReviewMessage("Thanks for sharing your review.");
+            setEditingReview(false);
+            setReviewMessage(editingReview ? "Your review has been updated." : "Thanks for sharing your review.");
             const refreshedProduct = await loadProduct();
             setProductResult({ id, product: refreshedProduct, error: null });
         } catch (submitError) {
@@ -194,6 +199,7 @@ function ProductDetails() {
     const cartQuantity = productCartItem?.quantity || 0;
     const availableToAdd = Math.max(product.stock_quantity - cartQuantity, 0);
     const selectedAddQuantity = Math.min(addQuantity, Math.max(availableToAdd, 1));
+    const ownReview = reviews.find((review) => review.is_owner);
 
     return (
         <div className="min-h-screen bg-slate-100 py-12">
@@ -327,7 +333,26 @@ function ProductDetails() {
 
                     <aside className="h-fit rounded-3xl bg-white p-6 shadow-sm">
                         <h2 className="text-xl font-bold text-slate-900">Leave a review</h2>
-                        {getAccessToken() ? (
+                        {getAccessToken() && (ownReview && !editingReview) ? (
+                            <div className="mt-5">
+                                <p className="text-sm text-slate-600">You’ve already reviewed this product.</p>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setReviewForm({
+                                            rating: String(ownReview.rating),
+                                            comment: ownReview.comment,
+                                        });
+                                        setEditingReview(true);
+                                        setReviewError("");
+                                        setReviewMessage("");
+                                    }}
+                                    className="mt-3 rounded-xl border border-indigo-200 px-4 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"
+                                >
+                                    Edit your review
+                                </button>
+                            </div>
+                        ) : getAccessToken() ? (
                             <form onSubmit={handleReviewSubmit} className="mt-5 space-y-4">
                                 <label className="block text-sm font-medium text-slate-700">
                                     Your rating
@@ -357,8 +382,25 @@ function ProductDetails() {
                                     disabled={reviewSubmitting}
                                     className="w-full rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
                                 >
-                                    {reviewSubmitting ? "Submitting..." : "Submit review"}
+                                    {reviewSubmitting
+                                        ? editingReview ? "Saving..." : "Submitting..."
+                                        : editingReview ? "Save changes" : "Submit review"}
                                 </button>
+                                {editingReview && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setReviewForm({ rating: "5", comment: "" });
+                                            setEditingReview(false);
+                                            setReviewError("");
+                                            setReviewMessage("");
+                                        }}
+                                        disabled={reviewSubmitting}
+                                        className="w-full rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed"
+                                    >
+                                        Cancel editing
+                                    </button>
+                                )}
                             </form>
                         ) : (
                             <p className="mt-3 text-sm text-slate-600">
