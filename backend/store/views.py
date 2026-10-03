@@ -35,7 +35,11 @@ def home(request):
 
 @api_view(["GET"])
 def get_products(request):
-    products = Product.objects.select_related("category").prefetch_related("reviews").all()
+    products = (
+        Product.objects.select_related("category")
+        .prefetch_related("reviews", "images")
+        .all()
+    )
     query = request.query_params.get("search", "").strip()
     category = request.query_params.get("category")
 
@@ -53,7 +57,11 @@ def get_products(request):
 @api_view(["GET"])
 def get_product(request, pk):
     try:
-        product = Product.objects.select_related("category").prefetch_related("reviews").get(id=pk)
+        product = (
+            Product.objects.select_related("category")
+            .prefetch_related("reviews", "images")
+            .get(id=pk)
+        )
         serializer = ProductSerializer(product, context={"request": request})
         return Response(serializer.data)
     except Product.DoesNotExist:
@@ -259,7 +267,7 @@ def get_wishlist(request):
     products = (
         Product.objects.filter(wishlisted_by__user=request.user)
         .select_related("category")
-        .prefetch_related("reviews")
+        .prefetch_related("reviews", "images")
         .order_by("name")
     )
     return Response(ProductSerializer(products, many=True, context={"request": request}).data)

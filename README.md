@@ -41,6 +41,7 @@ This app demonstrates:
 - Product list with shareable search, category, stock, and review filters
 - Quick add-to-cart actions on catalog cards with stock-aware feedback
 - Product detail page
+- Product image gallery with staff-managed image ordering
 - Customer reviews with one review per account and aggregate ratings
 - Cart with quantity updates, per-item totals, stock validation, and visible action errors
 - Product-page quantity selection with stock-validated cart updates

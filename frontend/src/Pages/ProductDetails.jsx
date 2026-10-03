@@ -8,6 +8,7 @@ function ProductDetails() {
     const navigate = useNavigate();
     const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
     const [productResult, setProductResult] = useState({ id: null, product: null, error: null });
+    const [selectedImage, setSelectedImage] = useState({ productId: null, index: 0 });
     const [reviews, setReviews] = useState([]);
     const [reviewsProductId, setReviewsProductId] = useState(null);
     const [reviewError, setReviewError] = useState("");
@@ -195,6 +196,15 @@ function ProductDetails() {
             : `${BASEURL}${product.image}`
         : "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=900&q=80";
     const productImage = product.external_image_url || imageSrc;
+    const galleryImages = [
+        { id: "primary", image_url: productImage, alt_text: product.name },
+        ...(product.images || []).map((image, index) => ({
+            ...image,
+            alt_text: image.alt_text || `${product.name}, view ${index + 2}`,
+        })),
+    ];
+    const selectedImageIndex = selectedImage.productId === id ? selectedImage.index : 0;
+    const displayedImage = galleryImages[selectedImageIndex] || galleryImages[0];
     const productCartItem = cartItems.find((item) => item.product === product.id);
     const cartQuantity = productCartItem?.quantity || 0;
     const availableToAdd = Math.max(product.stock_quantity - cartQuantity, 0);
@@ -211,7 +221,36 @@ function ProductDetails() {
                 <div className="overflow-hidden rounded-3xl bg-white shadow-lg">
                     <div className="grid gap-8 md:grid-cols-2">
                         <div className="p-6 md:p-8">
-                            <img src={productImage} alt={product.name} className="h-full min-h-[360px] w-full rounded-2xl object-cover" />
+                            <img
+                                src={displayedImage.image_url}
+                                alt={displayedImage.alt_text}
+                                className="h-full min-h-[360px] w-full rounded-2xl object-cover"
+                            />
+                            {galleryImages.length > 1 && (
+                                <div className="mt-4 flex flex-wrap gap-3" aria-label="Product image gallery">
+                                    {galleryImages.map((image, index) => (
+                                        <button
+                                            key={image.id}
+                                            type="button"
+                                            onClick={() => setSelectedImage({ productId: id, index })}
+                                            aria-label={`Show product image ${index + 1}`}
+                                            aria-pressed={selectedImageIndex === index}
+                                            className={`overflow-hidden rounded-xl border-2 transition focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                                selectedImageIndex === index
+                                                    ? "border-indigo-600"
+                                                    : "border-transparent hover:border-slate-300"
+                                            }`}
+                                        >
+                                            <img
+                                                src={image.image_url}
+                                                alt=""
+                                                aria-hidden="true"
+                                                className="h-16 w-16 object-cover sm:h-20 sm:w-20"
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex flex-col justify-center p-6 md:p-10">

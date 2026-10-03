@@ -9,6 +9,7 @@ from .models import (
     Order,
     OrderItem,
     Product,
+    ProductImage,
     Review,
     UserProfile,
     WishlistItem,
@@ -263,6 +264,29 @@ class StoreFeatureTests(APITestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Review.objects.count(), 0)
+
+    def test_product_api_includes_ordered_additional_images(self):
+        second_image = ProductImage.objects.create(
+            product=self.product,
+            image_url="https://example.com/second-view.jpg",
+            alt_text="Side view",
+            position=1,
+        )
+        first_image = ProductImage.objects.create(
+            product=self.product,
+            image_url="https://example.com/first-detail.jpg",
+            alt_text="Detail view",
+            position=0,
+        )
+
+        response = self.client.get(reverse("product_detail", args=[self.product.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [image["id"] for image in response.data["images"]],
+            [first_image.id, second_image.id],
+        )
+        self.assertEqual(response.data["images"][0]["alt_text"], "Detail view")
 
     def test_anonymous_customer_cannot_submit_review(self):
         self.client.force_authenticate(user=None)

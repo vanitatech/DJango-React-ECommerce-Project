@@ -1,6 +1,20 @@
 from django.contrib import admin
 
-from .models import Category, Product, Review, UserProfile, WishlistItem, Order, OrderItem
+from .models import (
+    Category,
+    Order,
+    OrderItem,
+    Product,
+    ProductImage,
+    Review,
+    UserProfile,
+    WishlistItem,
+)
+
+
+class ProductImageInline(admin.TabularInline):
+    model = ProductImage
+    extra = 1
 
 
 @admin.register(Product)
@@ -9,6 +23,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ('category',)
     search_fields = ('name', 'description')
     list_editable = ('stock_quantity', 'price')
+    inlines = [ProductImageInline]
 
 
 class OrderItemInline(admin.TabularInline):
