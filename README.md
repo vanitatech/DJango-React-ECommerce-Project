@@ -43,7 +43,7 @@ This app demonstrates:
 - Customer reviews with one review per account and aggregate ratings
 - Cart with quantity updates and removal
 - Stock-aware inventory and checkout validation
-- Protected checkout flow
+- Protected checkout with saved delivery-detail autofill and an order summary
 - Order creation with validation and order history
 - Customer profile management and processing-order cancellation
 - Account wishlist with saved products across sessions

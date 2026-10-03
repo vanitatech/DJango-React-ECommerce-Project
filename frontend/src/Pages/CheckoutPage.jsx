@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/useCart.js";
 import { authFetch } from "../utils/auth.js";
 
 function CheckoutPage() {
     const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
     const navigate = useNavigate();
-    const { clearCart } = useCart();
+    const { cartItems, total, clearCart } = useCart();
 
     const [form, setForm] = useState({
         name: "",
@@ -17,6 +17,38 @@ function CheckoutPage() {
 
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
+    const [messageType, setMessageType] = useState("");
+    const [profileNotice, setProfileNotice] = useState("");
+
+    useEffect(() => {
+        let active = true;
+
+        const loadSavedDeliveryDetails = async () => {
+            try {
+                const response = await authFetch(`${BASEURL}/api/profile/`);
+                if (!response.ok) {
+                    throw new Error("Unable to load saved delivery details.");
+                }
+                const profile = await response.json();
+                if (active) {
+                    setForm((current) => ({
+                        ...current,
+                        address: current.address || profile.address || "",
+                        phone: current.phone || profile.phone || "",
+                    }));
+                }
+            } catch {
+                if (active) {
+                    setProfileNotice("Saved delivery details couldn't be loaded. You can enter them below.");
+                }
+            }
+        };
+
+        void loadSavedDeliveryDetails();
+        return () => {
+            active = false;
+        };
+    }, [BASEURL]);
 
     const handleChange = (event) => {
         const { name, value } = event.target;
@@ -27,6 +59,7 @@ function CheckoutPage() {
         event.preventDefault();
         setLoading(true);
         setMessage("");
+        setMessageType("");
 
         try {
             const response = await authFetch(`${BASEURL}/api/orders/create/`, {
@@ -42,13 +75,16 @@ function CheckoutPage() {
             if (response.ok) {
                 clearCart();
                 setMessage(`Order #${data.order_id} placed successfully! Redirecting to your orders...`);
+                setMessageType("success");
                 setTimeout(() => navigate("/orders"), 1500);
                 return;
             }
 
             setMessage(data.error || "Failed to place order. Please try again.");
+            setMessageType("error");
         } catch {
             setMessage("An error occurred while placing your order. Please try again.");
+            setMessageType("error");
         } finally {
             setLoading(false);
         }
@@ -59,41 +95,84 @@ function CheckoutPage() {
             <div className="w-full max-w-xl rounded-3xl bg-white p-8 shadow-lg">
                 <h1 className="mb-6 text-center text-3xl font-black text-slate-900">Checkout</h1>
 
+                <section aria-labelledby="order-summary-heading" className="mb-6 rounded-2xl bg-slate-50 p-5">
+                    <h2 id="order-summary-heading" className="mb-4 text-lg font-bold text-slate-900">Order summary</h2>
+                    {cartItems.length ? (
+                        <>
+                            <ul className="space-y-3">
+                                {cartItems.map((item) => (
+                                    <li key={item.id} className="flex justify-between gap-4 text-sm">
+                                        <span className="text-slate-600">
+                                            {item.product_name} <span className="text-slate-400">× {item.quantity}</span>
+                                        </span>
+                                        <span className="shrink-0 font-medium text-slate-800">
+                                            ${(Number(item.product_price || 0) * item.quantity).toFixed(2)}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                            <div className="mt-4 flex justify-between border-t border-slate-200 pt-4 font-bold text-slate-900">
+                                <span>Total</span>
+                                <span>${Number(total || 0).toFixed(2)}</span>
+                            </div>
+                        </>
+                    ) : (
+                        <div>
+                            <p className="text-sm text-slate-600">Your cart is empty.</p>
+                            <Link to="/cart" className="mt-2 inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-700">
+                                Return to cart
+                            </Link>
+                        </div>
+                    )}
+                </section>
+
+                {profileNotice && (
+                    <p role="status" className="mb-4 text-sm text-amber-700">{profileNotice}</p>
+                )}
+
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input
+                        id="checkout-name"
                         type="text"
                         name="name"
                         value={form.name}
                         onChange={handleChange}
                         placeholder="Full name"
+                        aria-label="Full name"
                         required
                         className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500"
                     />
 
                     <textarea
+                        id="checkout-address"
                         name="address"
                         value={form.address}
                         onChange={handleChange}
                         placeholder="Shipping address"
+                        aria-label="Shipping address"
                         required
                         className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500"
                         rows="4"
                     />
 
                     <input
+                        id="checkout-phone"
                         type="tel"
                         name="phone"
                         value={form.phone}
                         onChange={handleChange}
                         placeholder="Phone number"
+                        aria-label="Phone number"
                         required
                         className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500"
                     />
 
                     <select
+                        id="checkout-payment-method"
                         name="payment_method"
                         value={form.payment_method}
                         onChange={handleChange}
+                        aria-label="Payment method"
                         className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500"
                     >
                         <option value="COD">Cash on delivery</option>
@@ -102,18 +181,15 @@ function CheckoutPage() {
 
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || cartItems.length === 0}
                         className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-base font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
                     >
                         {loading ? 'Processing...' : 'Place order'}
                     </button>
                 </form>
 
-                {message && (
-                    <p className={`mt-4 text-center text-sm font-medium ${message.startsWith('Order placed') ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {message}
-                    </p>
-                )}
+                {messageType === "success" && <p role="status" className="mt-4 text-center text-sm font-medium text-emerald-600">{message}</p>}
+                {messageType === "error" && <p role="alert" className="mt-4 text-center text-sm font-medium text-red-600">{message}</p>}
             </div>
         </div>
     );
