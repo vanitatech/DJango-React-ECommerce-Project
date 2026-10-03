@@ -9,6 +9,8 @@ export const CartProvider = ({ children }) => {
 
     const fetchCart = useCallback(async () => {
         if (!getAccessToken()) {
+            setCartItems([]);
+            setTotal(0);
             return;
         }
 
@@ -29,6 +31,15 @@ export const CartProvider = ({ children }) => {
 
     useEffect(() => {
         void Promise.resolve().then(fetchCart);
+
+        const handleAuthChange = () => {
+            void fetchCart();
+        };
+        window.addEventListener('auth-change', handleAuthChange);
+
+        return () => {
+            window.removeEventListener('auth-change', handleAuthChange);
+        };
     }, [fetchCart]);
 
     const addToCart = async (productId) => {
