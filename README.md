@@ -139,7 +139,7 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 ## Remaining roadmap
 
 Work through the existing customer-facing and quality phases before starting the
-new admin and content-management phases:
+new guest-checkout, admin, and content-management phases:
 
 1. **Continue storefront improvements** with customer-facing shopping and account
    flows.
@@ -149,11 +149,13 @@ new admin and content-management phases:
    customer journeys.
 4. **Revisit deployment and CI** (Docker or a cloud deployment). This phase is
    deferred while the focus remains on improving the software itself.
-5. **Add admin order management and fulfilment tools** after the preceding
+5. **Add guest checkout** so customers can place orders without creating an
+   account, with clear order confirmation and an optional account-creation path.
+6. **Add admin order management and fulfilment tools** after the preceding
    planned phases. Scope includes a searchable order work queue, clear status
    transitions, fulfilment and tracking details, and visibility into order
    history.
-6. **Add CMS capabilities** after the preceding planned phases, so authorized
+7. **Add CMS capabilities** after the preceding planned phases, so authorized
    staff can manage pages and reusable content such as banners and page sections
    without editing frontend code. Define publishing and content-safety
    requirements as part of that phase.
