@@ -1,9 +1,24 @@
+import { useState } from 'react';
 import { Link } from "react-router-dom";
 import { useCart } from "../context/useCart.js";
 
 function CartPage() {
     const { cartItems, total, removeFromCart, updateQuantity } = useCart();
     const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
+    const [pendingItemId, setPendingItemId] = useState(null);
+    const [actionError, setActionError] = useState({ itemId: null, message: '' });
+
+    const runCartAction = async (itemId, action) => {
+        setPendingItemId(itemId);
+        setActionError({ itemId: null, message: '' });
+        try {
+            await action();
+        } catch (error) {
+            setActionError({ itemId, message: error.message });
+        } finally {
+            setPendingItemId(null);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-slate-100 px-6 py-12">
@@ -42,33 +57,41 @@ function CartPage() {
                                         <div>
                                             <h2 className="text-lg font-semibold text-slate-800">{item.product_name}</h2>
                                             <p className="text-sm text-slate-500">${Number(item.product_price || 0).toFixed(2)} each</p>
+                                            <p className="mt-1 text-sm font-semibold text-slate-800" aria-label={`Line total $${(Number(item.product_price || 0) * item.quantity).toFixed(2)}`}>
+                                                Line total: ${(Number(item.product_price || 0) * item.quantity).toFixed(2)}
+                                            </p>
                                         </div>
                                     </div>
 
                                     <div className="flex items-center gap-3">
                                         <button
-                                            className="h-9 w-9 rounded-full bg-slate-200 font-bold text-slate-700 hover:bg-slate-300"
-                                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                            className="h-9 w-9 rounded-full bg-slate-200 font-bold text-slate-700 hover:bg-slate-300 disabled:cursor-wait disabled:opacity-50"
+                                            onClick={() => runCartAction(item.id, () => updateQuantity(item.id, item.quantity - 1))}
                                             aria-label="Decrease quantity"
+                                            disabled={pendingItemId === item.id}
                                         >
                                             -
                                         </button>
                                         <span className="w-6 text-center font-medium">{item.quantity}</span>
                                         <button
-                                            className="h-9 w-9 rounded-full bg-slate-200 font-bold text-slate-700 hover:bg-slate-300"
-                                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                            className="h-9 w-9 rounded-full bg-slate-200 font-bold text-slate-700 hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                                            onClick={() => runCartAction(item.id, () => updateQuantity(item.id, item.quantity + 1))}
                                             aria-label="Increase quantity"
-                                            disabled={item.quantity >= item.product_stock}
+                                            disabled={pendingItemId === item.id || item.quantity >= item.product_stock}
                                         >
                                             +
                                         </button>
                                         <button
-                                            className="ml-3 text-sm font-medium text-red-600 hover:text-red-700"
-                                            onClick={() => removeFromCart(item.id)}
+                                            className="ml-3 text-sm font-medium text-red-600 hover:text-red-700 disabled:cursor-wait disabled:opacity-50"
+                                            onClick={() => runCartAction(item.id, () => removeFromCart(item.id))}
+                                            disabled={pendingItemId === item.id}
                                         >
-                                            Remove
+                                            {pendingItemId === item.id ? 'Updating...' : 'Remove'}
                                         </button>
                                     </div>
+                                    {actionError.itemId === item.id && (
+                                        <p role="alert" className="text-sm text-red-600">{actionError.message}</p>
+                                    )}
                                     {item.quantity >= item.product_stock && (
                                         <p className="text-xs text-amber-700">Maximum available quantity reached.</p>
                                     )}

@@ -135,6 +135,21 @@ class StoreFeatureTests(APITestCase):
         item.refresh_from_db()
         self.assertEqual(item.quantity, 3)
 
+    def test_cart_quantity_update_rejects_stock_overflow_without_changing_quantity(self):
+        cart = Cart.objects.create(user=self.user)
+        item = CartItem.objects.create(cart=cart, product=self.product, quantity=2)
+
+        response = self.client.post(
+            "/api/cart/update/",
+            {"item_id": item.id, "quantity": 5},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Only 4 units", response.data["error"])
+        item.refresh_from_db()
+        self.assertEqual(item.quantity, 2)
+
     def test_order_history_only_returns_current_users_orders(self):
         own_order = Order.objects.create(
             user=self.user,

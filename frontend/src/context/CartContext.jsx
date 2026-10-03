@@ -63,14 +63,19 @@ export const CartProvider = ({ children }) => {
 
     const removeFromCart = async (itemId) => {
         try {
-            await authFetch(`${BASEURL}/api/cart/remove/`, {
+            const response = await authFetch(`${BASEURL}/api/cart/remove/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ item_id: itemId }),
             });
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Unable to remove this item from your cart.');
+            }
             await fetchCart();
         } catch (error) {
             console.error('Error removing from cart:', error);
+            throw error;
         }
     };
 
@@ -81,14 +86,19 @@ export const CartProvider = ({ children }) => {
         }
 
         try {
-            await authFetch(`${BASEURL}/api/cart/update/`, {
+            const response = await authFetch(`${BASEURL}/api/cart/update/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ item_id: itemId, quantity }),
             });
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Unable to update this item quantity.');
+            }
             await fetchCart();
         } catch (error) {
             console.error('Error updating quantity:', error);
+            throw error;
         }
     };
 

@@ -42,7 +42,7 @@ This app demonstrates:
 - Quick add-to-cart actions on catalog cards with stock-aware feedback
 - Product detail page
 - Customer reviews with one review per account and aggregate ratings
-- Cart with quantity updates and removal
+- Cart with quantity updates, per-item totals, stock validation, and visible action errors
 - Product-page quantity selection with stock-validated cart updates
 - Stock-aware inventory and checkout validation
 - Protected checkout with saved delivery-detail autofill and an order summary
