@@ -11,6 +11,8 @@ function ProductList() {
     const sortOptions = ["newest", "lowToHigh", "highToLow", "name"];
     const requestedSort = searchParams.get("sort");
     const sortBy = sortOptions.includes(requestedSort) ? requestedSort : "newest";
+    const inStockOnly = searchParams.get("inStock") === "true";
+    const reviewedOnly = searchParams.get("reviewed") === "true";
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -31,7 +33,7 @@ function ProductList() {
     const clearFilters = () => {
         setSearchParams((currentParams) => {
             const nextParams = new URLSearchParams(currentParams);
-            ["q", "category", "sort"].forEach((filter) => nextParams.delete(filter));
+            ["q", "category", "sort", "inStock", "reviewed"].forEach((filter) => nextParams.delete(filter));
             return nextParams;
         });
     };
@@ -85,11 +87,13 @@ function ProductList() {
                     !normalizedSearch ||
                     product.name.toLowerCase().includes(normalizedSearch) ||
                     product.description.toLowerCase().includes(normalizedSearch);
+                const stockMatch = !inStockOnly || product.stock_quantity > 0;
+                const reviewsMatch = !reviewedOnly || product.review_count > 0;
 
-                return categoryMatch && queryMatch;
+                return categoryMatch && queryMatch && stockMatch && reviewsMatch;
             })
             .sort(sorters[sortBy] || sorters.newest);
-    }, [products, searchTerm, selectedCategory, sortBy]);
+    }, [products, searchTerm, selectedCategory, sortBy, inStockOnly, reviewedOnly]);
 
     const reviewSummary = useMemo(() => {
         const reviewedProducts = products.filter((product) => product.review_count > 0);
@@ -188,24 +192,44 @@ function ProductList() {
                         </select>
                     </div>
 
-                    <select
-                        value={sortBy}
-                        onChange={(event) => updateFilter("sort", event.target.value === "newest" ? "" : event.target.value)}
-                        aria-label="Sort products"
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:bg-white"
-                    >
-                        <option value="newest">Newest arrivals</option>
-                        <option value="lowToHigh">Price: Low to high</option>
-                        <option value="highToLow">Price: High to low</option>
-                        <option value="name">Name</option>
-                    </select>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between md:justify-end">
+                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                                type="checkbox"
+                                checked={inStockOnly}
+                                onChange={(event) => updateFilter("inStock", event.target.checked ? "true" : "")}
+                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            In stock
+                        </label>
+                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                                type="checkbox"
+                                checked={reviewedOnly}
+                                onChange={(event) => updateFilter("reviewed", event.target.checked ? "true" : "")}
+                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            With reviews
+                        </label>
+                        <select
+                            value={sortBy}
+                            onChange={(event) => updateFilter("sort", event.target.value === "newest" ? "" : event.target.value)}
+                            aria-label="Sort products"
+                            className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:bg-white"
+                        >
+                            <option value="newest">Newest arrivals</option>
+                            <option value="lowToHigh">Price: Low to high</option>
+                            <option value="highToLow">Price: High to low</option>
+                            <option value="name">Name</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div className="mb-6 flex items-center justify-between">
                     <h2 className="text-2xl font-bold">Featured items</h2>
                     <div className="flex items-center gap-4">
                         <span className="text-sm text-slate-500">{filteredProducts.length} results</span>
-                        {(searchTerm || selectedCategory !== "all" || sortBy !== "newest") && (
+                        {(searchTerm || selectedCategory !== "all" || sortBy !== "newest" || inStockOnly || reviewedOnly) && (
                             <button
                                 type="button"
                                 onClick={clearFilters}

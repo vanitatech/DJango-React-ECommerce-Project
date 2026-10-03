@@ -38,7 +38,7 @@ This app demonstrates:
 
 - User signup and login
 - JWT access and refresh token flow
-- Product list with shareable search, category filters, and sorting
+- Product list with shareable search, category, stock, and review filters
 - Quick add-to-cart actions on catalog cards with stock-aware feedback
 - Product detail page
 - Customer reviews with one review per account and aggregate ratings
