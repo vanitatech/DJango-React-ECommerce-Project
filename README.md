@@ -136,11 +136,27 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 - Added a private, persistent wishlist for each customer account
 - Strengthened the project story for portfolio and recruiter review
 
-## Recommended next enhancements
+## Remaining roadmap
 
-- Add payment integration
-- Expand test coverage for authentication and frontend user journeys
-- Add deployment config for Docker or AWS
+Work through the existing customer-facing and quality phases before starting the
+new admin and content-management phases:
+
+1. **Continue storefront improvements** with customer-facing shopping and account
+   flows.
+2. **Add payment integration**, selecting a provider and using its sandbox before
+   enabling live transactions. The current card option is demo-only.
+3. **Expand automated coverage** for authentication, APIs, and end-to-end
+   customer journeys.
+4. **Revisit deployment and CI** (Docker or a cloud deployment). This phase is
+   deferred while the focus remains on improving the software itself.
+5. **Add admin order management and fulfilment tools** after the preceding
+   planned phases. Scope includes a searchable order work queue, clear status
+   transitions, fulfilment and tracking details, and visibility into order
+   history.
+6. **Add CMS capabilities** after the preceding planned phases, so authorized
+   staff can manage pages and reusable content such as banners and page sections
+   without editing frontend code. Define publishing and content-safety
+   requirements as part of that phase.
 
 ## License
 
