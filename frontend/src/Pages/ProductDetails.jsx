@@ -14,6 +14,11 @@ function ProductDetails() {
     const [reviewMessage, setReviewMessage] = useState("");
     const [reviewSubmitting, setReviewSubmitting] = useState(false);
     const [reviewForm, setReviewForm] = useState({ rating: "5", comment: "" });
+    const [isWishlisted, setIsWishlisted] = useState(false);
+    const [wishlistProductId, setWishlistProductId] = useState(null);
+    const [wishlistUpdating, setWishlistUpdating] = useState(false);
+    const [wishlistError, setWishlistError] = useState("");
+    const [wishlistMessage, setWishlistMessage] = useState("");
     const { addToCart } = useCart();
 
     const loadProduct = useCallback(async () => {
@@ -40,6 +45,27 @@ function ProductDetails() {
         }
     }, [BASEURL, id]);
 
+    const loadWishlistState = useCallback(async () => {
+        if (!getAccessToken()) {
+            setIsWishlisted(false);
+            setWishlistProductId(id);
+            return;
+        }
+        try {
+            const response = await authFetch(`${BASEURL}/api/wishlist/`);
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || "Unable to check saved products.");
+            }
+            setIsWishlisted(data.some((savedProduct) => String(savedProduct.id) === id));
+            setWishlistError("");
+        } catch (wishlistLoadError) {
+            setWishlistError(wishlistLoadError.message);
+        } finally {
+            setWishlistProductId(id);
+        }
+    }, [BASEURL, id]);
+
     useEffect(() => {
         let active = true;
         loadProduct()
@@ -54,11 +80,12 @@ function ProductDetails() {
                 }
             });
         void Promise.resolve().then(loadReviews);
+            void Promise.resolve().then(loadWishlistState);
 
         return () => {
             active = false;
         };
-    }, [id, loadProduct, loadReviews]);
+    }, [id, loadProduct, loadReviews, loadWishlistState]);
 
     const handleAddToCart = async () => {
         if (!getAccessToken()) {
@@ -104,6 +131,32 @@ function ProductDetails() {
             setReviewError(submitError.message);
         } finally {
             setReviewSubmitting(false);
+        }
+    };
+
+    const handleWishlistToggle = async () => {
+        if (!getAccessToken()) {
+            navigate("/login");
+            return;
+        }
+
+        setWishlistUpdating(true);
+        setWishlistError("");
+        setWishlistMessage("");
+        try {
+            const response = await authFetch(`${BASEURL}/api/wishlist/${id}/`, {
+                method: isWishlisted ? "DELETE" : "POST",
+            });
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || data.detail || "Unable to update your saved products.");
+            }
+            setIsWishlisted(!isWishlisted);
+            setWishlistMessage(isWishlisted ? "Removed from your saved products." : "Saved to your wishlist.");
+        } catch (wishlistUpdateError) {
+            setWishlistError(wishlistUpdateError.message);
+        } finally {
+            setWishlistUpdating(false);
         }
     };
 
@@ -167,6 +220,25 @@ function ProductDetails() {
                                     View cart
                                 </Link>
                             </div>
+                            <button
+                                type="button"
+                                onClick={handleWishlistToggle}
+                                disabled={wishlistUpdating || wishlistProductId !== id}
+                                aria-pressed={isWishlisted}
+                                className="mt-4 inline-flex w-fit items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-700 hover:text-indigo-700 disabled:cursor-wait disabled:text-slate-400"
+                            >
+                                <span aria-hidden="true">{isWishlisted ? "♥" : "♡"}</span>
+                                {wishlistUpdating
+                                    ? "Updating saved products..."
+                                    : isWishlisted
+                                        ? "Remove from wishlist"
+                                        : "Save to wishlist"}
+                            </button>
+                            {(wishlistMessage || wishlistError) && (
+                                <p role={wishlistError ? "alert" : "status"} className={`mt-1 text-sm ${wishlistError ? "text-red-600" : "text-emerald-700"}`}>
+                                    {wishlistError || wishlistMessage}
+                                </p>
+                            )}
                             {(reviewMessage || reviewError) && (
                                 <p role="status" className={`mt-4 text-sm ${reviewError ? "text-red-600" : "text-emerald-700"}`}>
                                     {reviewError || reviewMessage}

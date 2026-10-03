@@ -9,6 +9,7 @@ import Login from './Pages/Login';
 import Signup from './Pages/Signup';
 import OrderHistory from './Pages/OrderHistory';
 import ProfilePage from './Pages/ProfilePage';
+import WishlistPage from './Pages/WishlistPage';
 
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrderHistory />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/wishlist" element={<WishlistPage />} />
         </Route>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />

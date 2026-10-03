@@ -90,6 +90,24 @@ class Review(models.Model):
     def __str__(self):
         return f"{self.rating}/5 review for {self.product.name} by {self.user.username}"
 
+
+class WishlistItem(models.Model):
+    user = models.ForeignKey(User, related_name='wishlist_items', on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, related_name='wishlisted_by', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'product'], name='unique_wishlist_product_per_user'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} saved {self.product.name}"
+
+
 class Cart(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -112,7 +130,6 @@ class CartItem(models.Model):
     @property
     def subtotal(self):
         return self.quantity * self.product.price
-
 
 
 

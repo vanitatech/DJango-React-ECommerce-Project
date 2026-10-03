@@ -2,7 +2,17 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
-from .models import Cart, CartItem, Category, Order, OrderItem, Product, Review, UserProfile
+from .models import (
+    Cart,
+    CartItem,
+    Category,
+    Order,
+    OrderItem,
+    Product,
+    Review,
+    UserProfile,
+    WishlistItem,
+)
 
 
 class StoreFeatureTests(APITestCase):
@@ -241,3 +251,43 @@ class StoreFeatureTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 4)
+
+    def test_wishlist_is_private_and_returns_saved_products(self):
+        own_saved = Product.objects.create(
+            category=self.category,
+            name="Saved product",
+            price="12.00",
+        )
+        other_saved = Product.objects.create(
+            category=self.category,
+            name="Private product",
+            price="13.00",
+        )
+        WishlistItem.objects.create(user=self.user, product=own_saved)
+        WishlistItem.objects.create(user=self.other_user, product=other_saved)
+
+        response = self.client.get(reverse("get_wishlist"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item["id"] for item in response.data], [own_saved.id])
+
+    def test_wishlist_add_is_idempotent_and_can_be_removed(self):
+        add_url = reverse("update_wishlist", args=[self.product.id])
+
+        first_add = self.client.post(add_url)
+        repeated_add = self.client.post(add_url)
+        self.assertEqual(first_add.status_code, 201)
+        self.assertEqual(repeated_add.status_code, 200)
+        self.assertEqual(WishlistItem.objects.filter(user=self.user, product=self.product).count(), 1)
+
+        remove_response = self.client.delete(add_url)
+        self.assertEqual(remove_response.status_code, 204)
+        self.assertFalse(WishlistItem.objects.filter(user=self.user, product=self.product).exists())
+
+    def test_wishlist_rejects_unknown_products_and_requires_authentication(self):
+        missing_product = self.client.post(reverse("update_wishlist", args=[99999]))
+        self.assertEqual(missing_product.status_code, 404)
+
+        self.client.force_authenticate(user=None)
+        response = self.client.get(reverse("get_wishlist"))
+        self.assertEqual(response.status_code, 401)

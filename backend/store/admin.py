@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, Product, Review, UserProfile, Order, OrderItem
+from .models import Category, Product, Review, UserProfile, WishlistItem, Order, OrderItem
 
 
 @admin.register(Product)
@@ -32,6 +32,13 @@ class ReviewAdmin(admin.ModelAdmin):
     list_display = ('product', 'user', 'rating', 'created_at')
     list_filter = ('rating', 'created_at')
     search_fields = ('product__name', 'user__username', 'comment')
+
+
+@admin.register(WishlistItem)
+class WishlistItemAdmin(admin.ModelAdmin):
+    list_display = ('user', 'product', 'created_at')
+    search_fields = ('user__username', 'product__name')
+    list_filter = ('created_at',)
 
 
 admin.site.register(Category)

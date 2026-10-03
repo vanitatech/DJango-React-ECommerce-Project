@@ -5,7 +5,17 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Cart, CartItem, Category, Order, OrderItem, Product, Review, UserProfile
+from .models import (
+    Cart,
+    CartItem,
+    Category,
+    Order,
+    OrderItem,
+    Product,
+    Review,
+    UserProfile,
+    WishlistItem,
+)
 from .serializers import (
     CartItemSerializer,
     CartSerializer,
@@ -226,6 +236,45 @@ def get_orders(request):
         .order_by("-created_at")
     )
     return Response(OrderSerializer(orders, many=True).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_wishlist(request):
+    products = (
+        Product.objects.filter(wishlisted_by__user=request.user)
+        .select_related("category")
+        .prefetch_related("reviews")
+        .order_by("name")
+    )
+    return Response(ProductSerializer(products, many=True, context={"request": request}).data)
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def update_wishlist(request, product_pk):
+    try:
+        product = Product.objects.select_related("category").prefetch_related("reviews").get(
+            pk=product_pk
+        )
+    except Product.DoesNotExist:
+        return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        deleted, _ = WishlistItem.objects.filter(user=request.user, product=product).delete()
+        if not deleted:
+            return Response(
+                {"error": "Product is not in your wishlist."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    _, created = WishlistItem.objects.get_or_create(user=request.user, product=product)
+    serializer = ProductSerializer(product, context={"request": request})
+    return Response(
+        serializer.data,
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
 
 
 @api_view(["GET", "PUT", "PATCH"])

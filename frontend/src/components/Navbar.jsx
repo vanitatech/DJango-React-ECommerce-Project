@@ -44,6 +44,7 @@ function Navbar() {
                         <>
                             <Link to="/profile" className="hover:text-slate-900">Profile</Link>
                             <Link to="/orders" className="hover:text-slate-900">Orders</Link>
+                            <Link to="/wishlist" className="hover:text-slate-900">Saved</Link>
                             <button onClick={handleLogout} className="hover:text-slate-900">Logout</button>
                         </>
                     )}

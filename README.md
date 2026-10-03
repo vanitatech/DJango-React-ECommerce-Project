@@ -46,6 +46,7 @@ This app demonstrates:
 - Protected checkout flow
 - Order creation with validation and order history
 - Customer profile management and processing-order cancellation
+- Account wishlist with saved products across sessions
 - Django admin inventory and order-status management
 - Demo catalog seeding with distinct product imagery
 - Responsive storefront UI for mobile and desktop
@@ -117,6 +118,8 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 /api/orders/
 /api/orders/<id>/cancel/
 /api/profile/
+/api/wishlist/
+/api/wishlist/<product_id>/
 /api/products/<id>/reviews/
 ```
 
@@ -129,6 +132,7 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 - Added SQLite fallback so local development works without a Postgres instance
 - Added stock tracking, order history, and product reviews
 - Added account contact details and safe order cancellation with inventory restoration
+- Added a private, persistent wishlist for each customer account
 - Strengthened the project story for portfolio and recruiter review
 
 ## Recommended next enhancements
