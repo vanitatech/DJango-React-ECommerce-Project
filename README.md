@@ -58,12 +58,12 @@ DJango-React-ECommerce-Project/
 │   ├── store/
 │   ├── manage.py
 │   ├── requirements.txt
-│   └── .env
+│   └── .env.example
 ├── frontend/
 │   ├── src/
 │   ├── public/
 │   ├── package.json
-│   └── .env
+│   └── .env.example
 ├── README.md
 └── .gitignore
 ```
@@ -76,6 +76,7 @@ Requirements: Python 3.10+ and Node.js 22.12+.
 
 ```bash
 cd backend
+cp .env.example .env
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -88,11 +89,12 @@ python manage.py runserver
 
 ```bash
 cd frontend
+cp .env.example .env
 npm install
 npm run dev
 ```
 
-The frontend expects a backend URL in `frontend/.env`:
+The frontend expects a backend URL in `frontend/.env` (a template is provided at `frontend/.env.example`):
 
 ```env
 VITE_DJANGO_BASE_URL=http://localhost:8000
