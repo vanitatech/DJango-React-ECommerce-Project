@@ -1,7 +1,11 @@
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import patch
 
+import stripe
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from .models import (
@@ -179,6 +183,328 @@ class StoreFeatureTests(APITestCase):
         self.assertEqual(Order.objects.count(), 0)
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 4)
+
+    def test_card_checkout_creates_pending_order_and_stripe_session(self):
+        cart = Cart.objects.create(user=self.user)
+        CartItem.objects.create(cart=cart, product=self.product, quantity=2)
+        stripe_session = SimpleNamespace(
+            id="cs_test_order_1",
+            url="https://checkout.stripe.com/c/pay/cs_test_order_1",
+        )
+
+        with override_settings(
+            STRIPE_SECRET_KEY="sk_test_example",
+            STRIPE_WEBHOOK_SECRET="whsec_example",
+        ):
+            with patch(
+                "store.views.stripe.checkout.Session.create",
+                return_value=stripe_session,
+            ):
+                response = self.client.post(
+                    reverse("create_order"),
+                    {
+                        "name": "Shopper Name",
+                        "address": "10 Market Street",
+                        "phone": "0123456789",
+                        "payment_method": "CARD",
+                    },
+                    format="json",
+                )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["checkout_url"], stripe_session.url)
+        order = Order.objects.get(pk=response.data["order_id"])
+        self.assertEqual(order.status, Order.Status.AWAITING_PAYMENT)
+        self.assertEqual(order.payment_status, Order.PaymentStatus.PENDING)
+        self.assertEqual(order.stripe_session_id, stripe_session.id)
+        self.assertFalse(cart.items.exists())
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 2)
+
+    def test_card_checkout_requires_stripe_configuration_without_reserving_stock(self):
+        cart = Cart.objects.create(user=self.user)
+        CartItem.objects.create(cart=cart, product=self.product, quantity=2)
+
+        with override_settings(STRIPE_SECRET_KEY="", STRIPE_WEBHOOK_SECRET=""):
+            response = self.client.post(
+                reverse("create_order"),
+                {
+                    "name": "Shopper Name",
+                    "address": "10 Market Street",
+                    "phone": "0123456789",
+                    "payment_method": "CARD",
+                },
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(Order.objects.count(), 0)
+        self.assertTrue(cart.items.exists())
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 4)
+
+    def test_live_stripe_keys_do_not_enable_card_payments(self):
+        with override_settings(
+            STRIPE_SECRET_KEY="sk_live_example",
+            STRIPE_WEBHOOK_SECRET="whsec_example",
+        ):
+            response = self.client.get(reverse("payment_config"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["stripe_enabled"])
+
+    def test_stripe_session_failure_rolls_back_order_and_inventory(self):
+        cart = Cart.objects.create(user=self.user)
+        CartItem.objects.create(cart=cart, product=self.product, quantity=2)
+
+        with override_settings(
+            STRIPE_SECRET_KEY="sk_test_example",
+            STRIPE_WEBHOOK_SECRET="whsec_example",
+        ):
+            with patch(
+                "store.views.stripe.checkout.Session.create",
+                side_effect=stripe.StripeError("Stripe unavailable"),
+            ):
+                response = self.client.post(
+                    reverse("create_order"),
+                    {
+                        "name": "Shopper Name",
+                        "address": "10 Market Street",
+                        "phone": "0123456789",
+                        "payment_method": "CARD",
+                    },
+                    format="json",
+                )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(Order.objects.count(), 0)
+        self.assertTrue(cart.items.exists())
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 4)
+
+    def test_payment_status_verifies_completed_checkout_with_stripe(self):
+        self.product.stock_quantity = 3
+        self.product.save(update_fields=["stock_quantity"])
+        order = Order.objects.create(
+            user=self.user,
+            total_amount="25.00",
+            payment_method=Order.PaymentMethod.CARD,
+            payment_status=Order.PaymentStatus.PENDING,
+            status=Order.Status.AWAITING_PAYMENT,
+            stripe_session_id="cs_test_status_order",
+        )
+        OrderItem.objects.create(
+            order=order,
+            product=self.product,
+            product_name=self.product.name,
+            quantity=1,
+            price=self.product.price,
+        )
+        session_data = {
+            "id": order.stripe_session_id,
+            "metadata": {"order_id": str(order.pk)},
+            "amount_total": 2500,
+            "currency": "usd",
+            "payment_status": "paid",
+            "status": "complete",
+        }
+        stripe_session = SimpleNamespace(**session_data)
+        stripe_session.get = lambda key, default=None: session_data.get(key, default)
+
+        with override_settings(
+            STRIPE_SECRET_KEY="sk_test_example",
+            STRIPE_WEBHOOK_SECRET="whsec_example",
+        ):
+            with patch(
+                "store.views.stripe.checkout.Session.retrieve",
+                return_value=stripe_session,
+            ):
+                response = self.client.get(
+                    reverse("stripe_payment_status"),
+                    {"session_id": order.stripe_session_id},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["payment_status"], Order.PaymentStatus.PAID)
+        self.assertEqual(response.data["status"], Order.Status.PROCESSING)
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
+
+    def test_stripe_webhook_marks_order_paid_idempotently(self):
+        self.product.stock_quantity = 3
+        self.product.save(update_fields=["stock_quantity"])
+        order = Order.objects.create(
+            user=self.user,
+            total_amount="25.00",
+            customer_name="Shopper Name",
+            payment_method=Order.PaymentMethod.CARD,
+            payment_status=Order.PaymentStatus.PENDING,
+            status=Order.Status.AWAITING_PAYMENT,
+            stripe_session_id="cs_test_paid_order",
+        )
+        OrderItem.objects.create(
+            order=order,
+            product=self.product,
+            product_name=self.product.name,
+            quantity=1,
+            price=self.product.price,
+        )
+        event = {
+            "id": "evt_test_paid",
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": order.stripe_session_id,
+                    "metadata": {"order_id": str(order.pk)},
+                    "amount_total": 2500,
+                    "currency": "usd",
+                    "payment_status": "paid",
+                }
+            },
+        }
+
+        with override_settings(
+            STRIPE_SECRET_KEY="sk_test_example",
+            STRIPE_WEBHOOK_SECRET="whsec_example",
+        ):
+            with patch(
+                "store.views.stripe.Webhook.construct_event",
+                return_value=event,
+            ):
+                response = self.client.post(
+                    reverse("stripe_webhook"),
+                    data=b"{}",
+                    content_type="application/json",
+                    HTTP_STRIPE_SIGNATURE="valid-test-signature",
+                )
+                duplicate_response = self.client.post(
+                    reverse("stripe_webhook"),
+                    data=b"{}",
+                    content_type="application/json",
+                    HTTP_STRIPE_SIGNATURE="valid-test-signature",
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(duplicate_response.status_code, 200)
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
+        self.assertEqual(order.status, Order.Status.PROCESSING)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 3)
+
+    def test_expired_stripe_checkout_restores_stock_once(self):
+        self.product.stock_quantity = 3
+        self.product.save(update_fields=["stock_quantity"])
+        order = Order.objects.create(
+            user=self.user,
+            total_amount="25.00",
+            payment_method=Order.PaymentMethod.CARD,
+            payment_status=Order.PaymentStatus.PENDING,
+            status=Order.Status.AWAITING_PAYMENT,
+            stripe_session_id="cs_test_expired_order",
+            stripe_checkout_url="https://checkout.stripe.com/c/pay/cs_test_expired_order",
+        )
+        OrderItem.objects.create(
+            order=order,
+            product=self.product,
+            product_name=self.product.name,
+            quantity=1,
+            price=self.product.price,
+        )
+        event = {
+            "id": "evt_test_expired",
+            "type": "checkout.session.expired",
+            "data": {
+                "object": {
+                    "id": order.stripe_session_id,
+                    "metadata": {"order_id": str(order.pk)},
+                    "amount_total": 2500,
+                    "currency": "usd",
+                    "payment_status": "unpaid",
+                }
+            },
+        }
+
+        with override_settings(
+            STRIPE_SECRET_KEY="sk_test_example",
+            STRIPE_WEBHOOK_SECRET="whsec_example",
+        ):
+            with patch(
+                "store.views.stripe.Webhook.construct_event",
+                return_value=event,
+            ):
+                response = self.client.post(
+                    reverse("stripe_webhook"),
+                    data=b"{}",
+                    content_type="application/json",
+                    HTTP_STRIPE_SIGNATURE="valid-test-signature",
+                )
+                duplicate_response = self.client.post(
+                    reverse("stripe_webhook"),
+                    data=b"{}",
+                    content_type="application/json",
+                    HTTP_STRIPE_SIGNATURE="valid-test-signature",
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(duplicate_response.status_code, 200)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.Status.CANCELLED)
+        self.assertEqual(order.payment_status, Order.PaymentStatus.FAILED)
+        self.assertEqual(order.stripe_checkout_url, "")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 4)
+
+    def test_stripe_webhook_rejects_invalid_signatures(self):
+        with override_settings(
+            STRIPE_SECRET_KEY="sk_test_example",
+            STRIPE_WEBHOOK_SECRET="whsec_example",
+        ):
+            with patch(
+                "store.views.stripe.Webhook.construct_event",
+                side_effect=ValueError("Invalid signature"),
+            ):
+                response = self.client.post(
+                    reverse("stripe_webhook"),
+                    data=b"{}",
+                    content_type="application/json",
+                    HTTP_STRIPE_SIGNATURE="invalid-signature",
+                )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Order.objects.count(), 0)
+
+    def test_stripe_webhook_requests_retry_when_order_is_not_committed_yet(self):
+        event = {
+            "id": "evt_test_early_delivery",
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_not_committed",
+                    "metadata": {"order_id": "999"},
+                    "amount_total": 2500,
+                    "currency": "usd",
+                    "payment_status": "paid",
+                }
+            },
+        }
+
+        with override_settings(
+            STRIPE_SECRET_KEY="sk_test_example",
+            STRIPE_WEBHOOK_SECRET="whsec_example",
+        ):
+            with patch(
+                "store.views.stripe.Webhook.construct_event",
+                return_value=event,
+            ):
+                response = self.client.post(
+                    reverse("stripe_webhook"),
+                    data=b"{}",
+                    content_type="application/json",
+                    HTTP_STRIPE_SIGNATURE="valid-test-signature",
+                )
+
+        self.assertEqual(response.status_code, 503)
 
     def test_cart_cannot_exceed_available_stock(self):
         cart = Cart.objects.create(user=self.user)
@@ -458,6 +784,32 @@ class StoreFeatureTests(APITestCase):
         self.assertEqual(repeated_response.status_code, 400)
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 4)
+
+    def test_paid_card_order_cannot_be_cancelled_without_a_refund(self):
+        self.product.stock_quantity = 3
+        self.product.save(update_fields=["stock_quantity"])
+        order = Order.objects.create(
+            user=self.user,
+            total_amount="25.00",
+            payment_method=Order.PaymentMethod.CARD,
+            payment_status=Order.PaymentStatus.PAID,
+        )
+        OrderItem.objects.create(
+            order=order,
+            product=self.product,
+            product_name=self.product.name,
+            quantity=1,
+            price=self.product.price,
+        )
+
+        response = self.client.post(reverse("cancel_order", args=[order.id]))
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("without a Stripe refund", response.data["error"])
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.Status.PROCESSING)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 3)
 
     def test_order_cancellation_cannot_access_another_users_order(self):
         order = Order.objects.create(

@@ -85,11 +85,25 @@ function OrderHistory() {
                                     </div>
                                     <div className="flex flex-wrap items-center gap-3">
                                         <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                                            {order.status.toLowerCase()}
+                                            {order.status.replaceAll("_", " ").toLowerCase()}
                                         </span>
                                         <span className="text-lg font-bold text-slate-900">${Number(order.total_amount).toFixed(2)}</span>
                                     </div>
                                 </div>
+
+                                {order.status === "AWAITING_PAYMENT" && order.checkout_url && (
+                                    <div className="mt-5">
+                                        <a
+                                            href={order.checkout_url}
+                                            className="inline-flex rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+                                        >
+                                            Continue secure checkout
+                                        </a>
+                                        <p className="mt-2 text-xs text-slate-500">
+                                            This checkout session expires after 31 minutes.
+                                        </p>
+                                    </div>
+                                )}
 
                                 {order.status === "PROCESSING" && (
                                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -150,7 +164,13 @@ function OrderHistory() {
                                         <span className="font-medium text-slate-700">Ship to:</span> {order.customer_name}, {order.shipping_address}
                                     </p>
                                     <p className="text-slate-500 sm:text-right">
-                                        <span className="font-medium text-slate-700">Payment:</span> {order.payment_method === "COD" ? "Cash on delivery" : "Card (demo)"}
+                                        <span className="font-medium text-slate-700">Payment:</span>{" "}
+                                        {order.payment_method === "COD"
+                                            ? "Cash on delivery"
+                                            : order.payment_status === "SIMULATED"
+                                                ? "Card (demo)"
+                                                : "Card via Stripe"}{" "}
+                                        ({order.payment_status.replaceAll("_", " ").toLowerCase()})
                                     </p>
                                 </div>
                             </article>

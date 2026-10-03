@@ -109,6 +109,11 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    checkout_url = serializers.URLField(
+        source="stripe_checkout_url",
+        read_only=True,
+        allow_blank=True,
+    )
 
     class Meta:
         model = Order
@@ -121,7 +126,9 @@ class OrderSerializer(serializers.ModelSerializer):
             "shipping_address",
             "phone",
             "payment_method",
+            "payment_status",
             "status",
+            "checkout_url",
             "items",
         ]
         read_only_fields = fields

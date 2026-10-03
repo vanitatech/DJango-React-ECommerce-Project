@@ -88,6 +88,10 @@ USE_SQLITE = os.getenv('USE_SQLITE', 'false').lower() in {'1', 'true', 'yes', 'o
 DB_NAME = os.getenv('DB_NAME')
 DB_USER = os.getenv('DB_USER')
 DB_HOST = os.getenv('DB_HOST')
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
+STRIPE_CURRENCY = 'usd'
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 
 if USE_SQLITE or not (DB_NAME and DB_USER and DB_HOST):
     DATABASES = {
@@ -185,4 +189,3 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
-

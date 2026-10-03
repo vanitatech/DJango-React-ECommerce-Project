@@ -230,13 +230,13 @@ export const CartProvider = ({ children }) => {
         }
     };
 
-    const clearCart = () => {
+    const clearCart = useCallback(() => {
         if (!getAccessToken()) {
             localStorage.removeItem(GUEST_CART_KEY);
         }
         setCartItems([]);
         setTotal(0);
-    };
+    }, []);
 
     return (
         <CartContext.Provider value={{ cartItems, total, addToCart, removeFromCart, updateQuantity, clearCart, syncGuestCart }}>

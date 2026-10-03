@@ -1,5 +1,11 @@
-from django.http import JsonResponse
+import logging
+from decimal import Decimal
+
+import stripe
+from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.http import JsonResponse
+from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -28,6 +34,110 @@ from .serializers import (
     UserProfileSerializer,
     UserSerializer,
 )
+
+
+logger = logging.getLogger(__name__)
+
+
+def _stripe_is_configured():
+    return bool(
+        settings.STRIPE_SECRET_KEY.startswith("sk_test_")
+        and settings.STRIPE_WEBHOOK_SECRET.startswith("whsec_")
+    )
+
+
+def _create_stripe_checkout_session(order):
+    currency = settings.STRIPE_CURRENCY.lower()
+    line_items = [
+        {
+            "price_data": {
+                "currency": currency,
+                "unit_amount": int(item.price * Decimal("100")),
+                "product_data": {"name": item.product_name},
+            },
+            "quantity": item.quantity,
+        }
+        for item in order.items.all()
+    ]
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    return stripe.checkout.Session.create(
+        mode="payment",
+        payment_method_types=["card"],
+        line_items=line_items,
+        customer_email=order.customer_email or None,
+        client_reference_id=str(order.pk),
+        metadata={"order_id": str(order.pk)},
+        payment_intent_data={"metadata": {"order_id": str(order.pk)}},
+        success_url=f"{frontend_url}/checkout/return?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{frontend_url}/checkout?payment=cancelled&order_id={order.pk}",
+        expires_at=int(timezone.now().timestamp()) + 31 * 60,
+    )
+
+
+@transaction.atomic
+def _apply_stripe_checkout_session(session, event_type):
+    session_id = session.get("id")
+    order_id = (session.get("metadata") or {}).get("order_id")
+    if not session_id or not order_id:
+        return None, "invalid_session"
+
+    try:
+        order = Order.objects.select_for_update().get(
+            pk=order_id,
+            stripe_session_id=session_id,
+            payment_method=Order.PaymentMethod.CARD,
+        )
+    except Order.DoesNotExist:
+        return None, "order_not_found"
+
+    expected_amount = int(order.total_amount * Decimal("100"))
+    if (
+        session.get("amount_total") != expected_amount
+        or session.get("currency") != settings.STRIPE_CURRENCY.lower()
+    ):
+        return None, "amount_mismatch"
+
+    if event_type == "checkout.session.completed":
+        if session.get("payment_status") != "paid":
+            return order, None
+        if (
+            order.status == Order.Status.AWAITING_PAYMENT
+            and order.payment_status == Order.PaymentStatus.PENDING
+        ):
+            order.status = Order.Status.PROCESSING
+            order.payment_status = Order.PaymentStatus.PAID
+            order.save(update_fields=["status", "payment_status"])
+        return order, None
+
+    if event_type in {
+        "checkout.session.expired",
+        "checkout.session.async_payment_failed",
+    } and (
+        order.status == Order.Status.AWAITING_PAYMENT
+        and order.payment_status == Order.PaymentStatus.PENDING
+    ):
+        order_items = list(order.items.order_by("product_id"))
+        product_ids = sorted({item.product_id for item in order_items})
+        products = {
+            product.pk: product
+            for product in Product.objects.select_for_update()
+            .filter(pk__in=product_ids)
+            .order_by("pk")
+        }
+        for item in order_items:
+            product = products[item.product_id]
+            product.stock_quantity += item.quantity
+            product.save(update_fields=["stock_quantity"])
+
+        order.status = Order.Status.CANCELLED
+        order.payment_status = Order.PaymentStatus.FAILED
+        order.stripe_checkout_url = ""
+        order.save(
+            update_fields=["status", "payment_status", "stripe_checkout_url"]
+        )
+
+    return order, None
 
 
 def home(request):
@@ -210,6 +320,15 @@ def create_order(request):
     if payment_method not in Order.PaymentMethod.values:
         return Response({"error": "Invalid payment method."}, status=400)
 
+    if (
+        payment_method == Order.PaymentMethod.CARD
+        and not _stripe_is_configured()
+    ):
+        return Response(
+            {"error": "Card payments are not configured. Choose cash on delivery or try again later."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
     cart = None
     if request.user.is_authenticated:
         cart, _ = Cart.objects.get_or_create(user=request.user)
@@ -274,6 +393,16 @@ def create_order(request):
         shipping_address=address,
         phone=phone,
         payment_method=payment_method,
+        payment_status=(
+            Order.PaymentStatus.PENDING
+            if payment_method == Order.PaymentMethod.CARD
+            else Order.PaymentStatus.NOT_REQUIRED
+        ),
+        status=(
+            Order.Status.AWAITING_PAYMENT
+            if payment_method == Order.PaymentMethod.CARD
+            else Order.Status.PROCESSING
+        ),
     )
 
     for product_id, quantity in quantities.items():
@@ -288,6 +417,22 @@ def create_order(request):
         product.stock_quantity -= quantity
         product.save(update_fields=["stock_quantity"])
 
+    checkout_session = None
+    if payment_method == Order.PaymentMethod.CARD:
+        try:
+            checkout_session = _create_stripe_checkout_session(order)
+        except stripe.StripeError:
+            logger.exception("Stripe Checkout Session creation failed for order %s", order.pk)
+            transaction.set_rollback(True)
+            return Response(
+                {"error": "Card checkout is temporarily unavailable. Your cart has not been charged."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        order.stripe_session_id = checkout_session.id
+        order.stripe_checkout_url = checkout_session.url
+        order.save(update_fields=["stripe_session_id", "stripe_checkout_url"])
+
     if cart is not None:
         cart.items.all().delete()
 
@@ -298,8 +443,115 @@ def create_order(request):
             "total": float(total),
             "payment_method": payment_method,
             "status": order.status,
+            "payment_status": order.payment_status,
+            "checkout_url": checkout_session.url if checkout_session else None,
         },
         status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def payment_config(request):
+    return Response(
+        {
+            "stripe_enabled": _stripe_is_configured(),
+            "currency": settings.STRIPE_CURRENCY.lower(),
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def stripe_webhook(request):
+    if not _stripe_is_configured():
+        return Response(
+            {"error": "Stripe webhooks are not configured."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    signature = request.headers.get("Stripe-Signature")
+    try:
+        event = stripe.Webhook.construct_event(
+            request.body,
+            signature,
+            settings.STRIPE_WEBHOOK_SECRET,
+        )
+    except (ValueError, stripe.SignatureVerificationError):
+        return Response({"error": "Invalid Stripe webhook signature."}, status=400)
+
+    event_type = event["type"]
+    if event_type not in {
+        "checkout.session.completed",
+        "checkout.session.expired",
+        "checkout.session.async_payment_failed",
+    }:
+        return Response({"received": True})
+
+    order, error = _apply_stripe_checkout_session(
+        event["data"]["object"],
+        event_type,
+    )
+    if error == "order_not_found":
+        logger.warning("Stripe event %s has no matching order.", event.get("id"))
+        return Response(
+            {"error": "The order is not available yet. Stripe should retry this event."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    if error:
+        logger.error("Stripe event %s failed validation: %s", event.get("id"), error)
+        return Response({"error": "Stripe event does not match the pending order."}, status=400)
+
+    return Response({"received": True, "order_id": order.pk})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def stripe_payment_status(request):
+    session_id = request.query_params.get("session_id", "")
+    order = Order.objects.filter(
+        stripe_session_id=session_id,
+        payment_method=Order.PaymentMethod.CARD,
+    ).first()
+    if not order or (
+        request.user.is_authenticated and order.user_id != request.user.id
+    ):
+        return Response({"error": "Payment session not found."}, status=404)
+
+    if order.payment_status == Order.PaymentStatus.PENDING:
+        if not _stripe_is_configured():
+            return Response(
+                {"error": "Stripe test-mode payment verification is not configured."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+        except stripe.StripeError:
+            logger.exception("Unable to retrieve Stripe session for order %s", order.pk)
+            return Response(
+                {"error": "Unable to verify payment with Stripe. Please try again."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        event_type = {
+            ("complete", "paid"): "checkout.session.completed",
+            ("expired", "unpaid"): "checkout.session.expired",
+        }.get((session.status, session.payment_status))
+        if event_type:
+            order, error = _apply_stripe_checkout_session(session, event_type)
+            if error:
+                logger.error("Stripe session for order %s failed validation: %s", order.pk, error)
+                return Response({"error": "Stripe session does not match the order."}, status=400)
+
+    return Response(
+        {
+            "order_id": order.pk,
+            "status": order.status,
+            "payment_status": order.payment_status,
+            "total": float(order.total_amount),
+            "checkout_url": order.stripe_checkout_url,
+        }
     )
 
 
@@ -378,6 +630,15 @@ def cancel_order(request, pk):
         order = Order.objects.select_for_update().get(pk=pk, user=request.user)
     except Order.DoesNotExist:
         return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if (
+        order.payment_method == Order.PaymentMethod.CARD
+        and order.payment_status == Order.PaymentStatus.PAID
+    ):
+        return Response(
+            {"error": "Paid card orders cannot be cancelled without a Stripe refund. Please contact support."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     if order.status != Order.Status.PROCESSING:
         return Response(

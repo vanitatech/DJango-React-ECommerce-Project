@@ -48,6 +48,7 @@ This app demonstrates:
 - Product-page quantity selection with stock-validated cart updates
 - Stock-aware inventory and checkout validation
 - Checkout with saved delivery-detail autofill for members and an order summary
+- Stripe-hosted card checkout restricted to test-mode keys, with verified webhooks
 - Order creation with validation and order history
 - Customer profile management and processing-order cancellation
 - Account wishlist with saved products across sessions
@@ -91,6 +92,34 @@ python manage.py seed_store
 python manage.py runserver
 ```
 
+### Optional Stripe test checkout
+
+Card checkout stays disabled unless both Stripe test-mode credentials are
+configured. Add your `sk_test_...` key and the webhook signing secret to
+`backend/.env`; never use a live key for local testing:
+
+```env
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+FRONTEND_URL=http://localhost:5173
+```
+
+Install and authenticate the [Stripe CLI](https://docs.stripe.com/stripe-cli),
+then forward test events to the local webhook:
+
+```bash
+stripe login
+stripe listen --forward-to localhost:8000/api/payments/stripe/webhook/
+```
+
+Copy the `whsec_...` value printed by `stripe listen` into
+`STRIPE_WEBHOOK_SECRET`, then restart Django. Use Stripe's documented test card
+numbers in the hosted checkout; no live payment can be created by this app.
+Stripe Checkout sessions reserve stock for 31 minutes. Verified completion
+events mark orders paid; expiration releases the reserved stock.
+Paid card orders cannot be cancelled through the standard cancellation endpoint
+because a refund must be issued first.
+
 ### 2) Frontend
 
 ```bash
@@ -120,7 +149,10 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 /api/cart/update/
 /api/orders/create/
 /api/orders/
+/api/orders/payment-status/?session_id=<stripe-session-id>
 /api/orders/<id>/cancel/
+/api/payments/config/
+/api/payments/stripe/webhook/
 /api/profile/
 /api/wishlist/
 /api/wishlist/<product_id>/
@@ -148,8 +180,10 @@ management and content management:
 
 1. **Continue storefront improvements** with customer-facing shopping and account
    flows.
-2. **Add payment integration**, selecting a provider and using its sandbox before
-   enabling live transactions. The current card option is demo-only.
+2. **Implemented: Stripe Checkout in test mode** with signed webhook
+   verification and inventory release on session expiry. A sandbox smoke test
+   still requires the developer's own Stripe test credentials and Stripe CLI;
+   live keys are explicitly rejected.
 3. **Expand automated coverage** for authentication, APIs, and end-to-end
    customer journeys.
 4. **Revisit deployment and CI** (Docker or a cloud deployment). This phase is

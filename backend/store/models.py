@@ -47,6 +47,7 @@ class UserProfile(models.Model):
 
 class Order(models.Model):
     class Status(models.TextChoices):
+        AWAITING_PAYMENT = 'AWAITING_PAYMENT', 'Awaiting payment'
         PROCESSING = 'PROCESSING', 'Processing'
         SHIPPED = 'SHIPPED', 'Shipped'
         DELIVERED = 'DELIVERED', 'Delivered'
@@ -54,7 +55,14 @@ class Order(models.Model):
 
     class PaymentMethod(models.TextChoices):
         COD = 'COD', 'Cash on delivery'
-        CARD = 'CARD', 'Card (demo)'
+        CARD = 'CARD', 'Card (Stripe Checkout)'
+
+    class PaymentStatus(models.TextChoices):
+        NOT_REQUIRED = 'NOT_REQUIRED', 'Not required'
+        PENDING = 'PENDING', 'Pending'
+        PAID = 'PAID', 'Paid'
+        FAILED = 'FAILED', 'Failed'
+        SIMULATED = 'SIMULATED', 'Simulated'
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -66,8 +74,17 @@ class Order(models.Model):
     payment_method = models.CharField(
         max_length=10, choices=PaymentMethod.choices, default=PaymentMethod.COD
     )
+    payment_status = models.CharField(
+        max_length=16,
+        choices=PaymentStatus.choices,
+        default=PaymentStatus.NOT_REQUIRED,
+    )
+    stripe_session_id = models.CharField(
+        max_length=255, blank=True, null=True, unique=True
+    )
+    stripe_checkout_url = models.URLField(blank=True)
     status = models.CharField(
-        max_length=12, choices=Status.choices, default=Status.PROCESSING
+        max_length=20, choices=Status.choices, default=Status.PROCESSING
     )
 
     def __str__(self):
@@ -145,7 +162,6 @@ class CartItem(models.Model):
     @property
     def subtotal(self):
         return self.quantity * self.product.price
-
 
 
 

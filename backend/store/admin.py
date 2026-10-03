@@ -35,8 +35,16 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'status', 'total_amount', 'payment_method', 'created_at')
-    list_filter = ('status', 'payment_method', 'created_at')
+    list_display = (
+        'id',
+        'user',
+        'status',
+        'payment_status',
+        'total_amount',
+        'payment_method',
+        'created_at',
+    )
+    list_filter = ('status', 'payment_status', 'payment_method', 'created_at')
     search_fields = ('user__username', 'customer_name', 'customer_email', 'phone')
     readonly_fields = (
         'user',
@@ -47,8 +55,17 @@ class OrderAdmin(admin.ModelAdmin):
         'shipping_address',
         'phone',
         'payment_method',
+        'payment_status',
+        'stripe_session_id',
+        'stripe_checkout_url',
     )
     inlines = [OrderItemInline]
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = super().get_readonly_fields(request, obj)
+        if obj and obj.payment_status == Order.PaymentStatus.PENDING:
+            return (*readonly_fields, 'status')
+        return readonly_fields
 
 
 @admin.register(Review)

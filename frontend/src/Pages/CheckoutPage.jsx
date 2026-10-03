@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "../context/useCart.js";
 import { authFetch, getAccessToken } from "../utils/auth.js";
 
 function CheckoutPage() {
     const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { cartItems, total, clearCart, syncGuestCart } = useCart();
     const isAuthenticated = Boolean(getAccessToken());
 
@@ -21,6 +22,35 @@ function CheckoutPage() {
     const [messageType, setMessageType] = useState("");
     const [profileNotice, setProfileNotice] = useState("");
     const [orderConfirmation, setOrderConfirmation] = useState(null);
+    const [stripeEnabled, setStripeEnabled] = useState(false);
+    const [paymentConfigError, setPaymentConfigError] = useState("");
+
+    useEffect(() => {
+        let active = true;
+        const loadPaymentConfig = async () => {
+            try {
+                const response = await fetch(`${BASEURL}/api/payments/config/`);
+                if (!response.ok) {
+                    throw new Error("Unable to check card payment availability.");
+                }
+                const config = await response.json();
+                if (active) {
+                    setStripeEnabled(config.stripe_enabled);
+                    setPaymentConfigError("");
+                }
+            } catch (error) {
+                console.error("Unable to load payment configuration:", error);
+                if (active) {
+                    setPaymentConfigError("Card payments are currently unavailable. You can still use cash on delivery.");
+                }
+            }
+        };
+
+        void loadPaymentConfig();
+        return () => {
+            active = false;
+        };
+    }, [BASEURL]);
 
     useEffect(() => {
         if (!isAuthenticated) {
@@ -92,6 +122,17 @@ function CheckoutPage() {
                 throw new Error(data.error || "Failed to place order. Please try again.");
             }
 
+            if (form.payment_method === "CARD") {
+                if (!data.checkout_url) {
+                    throw new Error("Stripe did not return a checkout link. Please contact support before retrying.");
+                }
+                if (isAuthenticated) {
+                    clearCart();
+                }
+                window.location.assign(data.checkout_url);
+                return;
+            }
+
             clearCart();
             if (isAuthenticated) {
                 setMessage(`Order #${data.order_id} placed successfully! Redirecting to your orders...`);
@@ -155,6 +196,13 @@ function CheckoutPage() {
                     </section>
                 ) : (
                     <>
+                        {searchParams.get("payment") === "cancelled" && (
+                            <p role="status" className="mb-5 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+                                {isAuthenticated
+                                    ? "Card checkout was closed before payment completed. Your order remains available in order history until its payment session expires."
+                                    : "Card checkout was closed before payment completed. Your guest cart is still available; the pending payment session will expire automatically."}
+                            </p>
+                        )}
                         {!isAuthenticated && (
                             <p className="mb-5 rounded-xl bg-indigo-50 p-3 text-sm text-indigo-800">
                                 Checking out as a guest. You do not need to create an account.
@@ -250,8 +298,16 @@ function CheckoutPage() {
                                 className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-indigo-500"
                             >
                                 <option value="COD">Cash on delivery</option>
-                                <option value="CARD">Card (demo only; no payment processed)</option>
+                                <option value="CARD" disabled={!stripeEnabled}>Card (Stripe secure checkout)</option>
                             </select>
+                            {paymentConfigError && (
+                                <p role="status" className="text-sm text-amber-700">{paymentConfigError}</p>
+                            )}
+                            {!stripeEnabled && !paymentConfigError && (
+                                <p className="text-sm text-slate-500">
+                                    Card payments are disabled until Stripe test-mode keys and a webhook secret are configured.
+                                </p>
+                            )}
                             <button
                                 type="submit"
                                 disabled={loading || cartItems.length === 0}
