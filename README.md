@@ -45,6 +45,7 @@ This app demonstrates:
 - Stock-aware inventory and checkout validation
 - Protected checkout flow
 - Order creation with validation and order history
+- Customer profile management and processing-order cancellation
 - Django admin inventory and order-status management
 - Demo catalog seeding with distinct product imagery
 - Responsive storefront UI for mobile and desktop
@@ -114,6 +115,8 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 /api/cart/update/
 /api/orders/create/
 /api/orders/
+/api/orders/<id>/cancel/
+/api/profile/
 /api/products/<id>/reviews/
 ```
 
@@ -125,11 +128,11 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 - Improved responsive product browsing experience
 - Added SQLite fallback so local development works without a Postgres instance
 - Added stock tracking, order history, and product reviews
+- Added account contact details and safe order cancellation with inventory restoration
 - Strengthened the project story for portfolio and recruiter review
 
 ## Recommended next enhancements
 
-- Add a customer profile page and order cancellation workflow
 - Add payment integration
 - Expand test coverage for authentication and frontend user journeys
 - Add deployment config for Docker or AWS

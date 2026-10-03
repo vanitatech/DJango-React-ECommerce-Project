@@ -7,6 +7,9 @@ function OrderHistory() {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [cancellingOrderId, setCancellingOrderId] = useState(null);
+    const [confirmOrderId, setConfirmOrderId] = useState(null);
+    const [cancelError, setCancelError] = useState("");
 
     useEffect(() => {
         const loadOrders = async () => {
@@ -25,6 +28,26 @@ function OrderHistory() {
 
         loadOrders();
     }, [BASEURL]);
+
+    const handleCancelOrder = async (orderId) => {
+        setCancellingOrderId(orderId);
+        setCancelError("");
+        try {
+            const response = await authFetch(`${BASEURL}/api/orders/${orderId}/cancel/`, {
+                method: "POST",
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "Unable to cancel this order.");
+            }
+            setOrders((current) => current.map((order) => order.id === orderId ? data : order));
+            setConfirmOrderId(null);
+        } catch (cancelRequestError) {
+            setCancelError(cancelRequestError.message);
+        } finally {
+            setCancellingOrderId(null);
+        }
+    };
 
     return (
         <main className="min-h-screen bg-slate-100 px-6 py-12">
@@ -67,6 +90,47 @@ function OrderHistory() {
                                         <span className="text-lg font-bold text-slate-900">${Number(order.total_amount).toFixed(2)}</span>
                                     </div>
                                 </div>
+
+                                {order.status === "PROCESSING" && (
+                                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                                        <p className="text-xs text-slate-500">You can cancel while your order is processing.</p>
+                                        {confirmOrderId === order.id ? (
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-sm text-slate-600">Cancel this order?</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCancelOrder(order.id)}
+                                                    disabled={cancellingOrderId === order.id}
+                                                    className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300"
+                                                >
+                                                    {cancellingOrderId === order.id ? "Cancelling..." : "Confirm cancel"}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setConfirmOrderId(null)}
+                                                    disabled={cancellingOrderId === order.id}
+                                                    className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                                                >
+                                                    Keep order
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setCancelError("");
+                                                    setConfirmOrderId(order.id);
+                                                }}
+                                                className="text-sm font-semibold text-red-600 hover:text-red-700"
+                                            >
+                                                Cancel order
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                                {cancelError && confirmOrderId === order.id && (
+                                    <p role="alert" className="mt-3 text-sm text-red-600">{cancelError}</p>
+                                )}
 
                                 <ul className="divide-y divide-slate-100">
                                     {order.items.map((item) => (

@@ -1,11 +1,13 @@
 export const saveTokens = (tokens) => {
     localStorage.setItem("access_token", tokens.access);
     localStorage.setItem("refresh_token", tokens.refresh);
+    window.dispatchEvent(new Event("auth-change"));
 };
 
 export const clearTokens = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    window.dispatchEvent(new Event("auth-change"));
 };
 
 export const getAccessToken = () => localStorage.getItem("access_token");

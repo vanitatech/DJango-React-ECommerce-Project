@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
-from .models import Cart, CartItem, Category, Order, OrderItem, Product, Review
+from .models import Cart, CartItem, Category, Order, OrderItem, Product, Review, UserProfile
 
 
 class StoreFeatureTests(APITestCase):
@@ -150,3 +150,94 @@ class StoreFeatureTests(APITestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(Review.objects.count(), 0)
+
+    def test_profile_can_be_retrieved_and_updated(self):
+        get_response = self.client.get(reverse("user_profile"))
+        self.assertEqual(get_response.status_code, 200)
+        self.assertEqual(get_response.data["username"], "shopper")
+
+        update_response = self.client.put(
+            reverse("user_profile"),
+            {
+                "email": "shopper@example.com",
+                "phone": "0123456789",
+                "address": "10 Market Street",
+            },
+            format="json",
+        )
+
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.data["email"], "shopper@example.com")
+        self.assertEqual(update_response.data["phone"], "0123456789")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "shopper@example.com")
+        self.assertEqual(UserProfile.objects.get(user=self.user).address, "10 Market Street")
+
+    def test_profile_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(reverse("user_profile"))
+
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(UserProfile.objects.exists())
+
+    def test_order_cancellation_restores_stock_and_is_idempotently_blocked(self):
+        self.product.stock_quantity = 2
+        self.product.save(update_fields=["stock_quantity"])
+        order = Order.objects.create(
+            user=self.user,
+            total_amount="50.00",
+            customer_name="Shopper Name",
+            shipping_address="10 Market Street",
+        )
+        OrderItem.objects.create(
+            order=order,
+            product=self.product,
+            product_name=self.product.name,
+            quantity=2,
+            price=self.product.price,
+        )
+
+        response = self.client.post(reverse("cancel_order", args=[order.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], Order.Status.CANCELLED)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 4)
+
+        repeated_response = self.client.post(reverse("cancel_order", args=[order.id]))
+        self.assertEqual(repeated_response.status_code, 400)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 4)
+
+    def test_order_cancellation_cannot_access_another_users_order(self):
+        order = Order.objects.create(
+            user=self.other_user,
+            total_amount="25.00",
+            status=Order.Status.PROCESSING,
+        )
+
+        response = self.client.post(reverse("cancel_order", args=[order.id]))
+
+        self.assertEqual(response.status_code, 404)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.Status.PROCESSING)
+
+    def test_only_processing_orders_can_be_cancelled(self):
+        order = Order.objects.create(
+            user=self.user,
+            total_amount="25.00",
+            status=Order.Status.SHIPPED,
+        )
+        OrderItem.objects.create(
+            order=order,
+            product=self.product,
+            product_name=self.product.name,
+            quantity=1,
+            price=self.product.price,
+        )
+
+        response = self.client.post(reverse("cancel_order", args=[order.id]))
+
+        self.assertEqual(response.status_code, 400)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 4)

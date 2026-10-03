@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from .models import Cart, CartItem, Category, Order, OrderItem, Product, Review
+from .models import Cart, CartItem, Category, Order, OrderItem, Product, Review, UserProfile
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -101,6 +101,27 @@ class OrderSerializer(serializers.ModelSerializer):
             "items",
         ]
         read_only_fields = fields
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+    email = serializers.EmailField(source="user.email")
+
+    class Meta:
+        model = UserProfile
+        fields = ["username", "email", "phone", "address"]
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop("user", {})
+        instance.phone = validated_data.get("phone", instance.phone)
+        instance.address = validated_data.get("address", instance.address)
+        instance.save(update_fields=["phone", "address"])
+
+        if "email" in user_data:
+            instance.user.email = user_data["email"]
+            instance.user.save(update_fields=["email"])
+
+        return instance
 
 
 class UserSerializer(serializers.ModelSerializer):

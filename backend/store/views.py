@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Cart, CartItem, Category, Order, OrderItem, Product, Review
+from .models import Cart, CartItem, Category, Order, OrderItem, Product, Review, UserProfile
 from .serializers import (
     CartItemSerializer,
     CartSerializer,
@@ -14,6 +14,7 @@ from .serializers import (
     ProductSerializer,
     RegisterSerializer,
     ReviewSerializer,
+    UserProfileSerializer,
     UserSerializer,
 )
 
@@ -225,6 +226,49 @@ def get_orders(request):
         .order_by("-created_at")
     )
     return Response(OrderSerializer(orders, many=True).data)
+
+
+@api_view(["GET", "PUT", "PATCH"])
+@permission_classes([IsAuthenticated])
+def user_profile(request):
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if request.method == "GET":
+        return Response(UserProfileSerializer(profile).data)
+
+    partial = request.method == "PATCH"
+    serializer = UserProfileSerializer(
+        profile, data=request.data, partial=partial, context={"request": request}
+    )
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def cancel_order(request, pk):
+    try:
+        order = Order.objects.select_for_update().get(pk=pk, user=request.user)
+    except Order.DoesNotExist:
+        return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if order.status != Order.Status.PROCESSING:
+        return Response(
+            {"error": "Only processing orders can be cancelled."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    items = list(order.items.order_by("product_id").all())
+    for item in items:
+        product = Product.objects.select_for_update().get(pk=item.product_id)
+        product.stock_quantity += item.quantity
+        product.save(update_fields=["stock_quantity"])
+
+    order.status = Order.Status.CANCELLED
+    order.save(update_fields=["status"])
+    return Response(OrderSerializer(order).data)
 
 
 @api_view(["GET", "POST"])

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/useCart.js";
 import { clearTokens, getAccessToken } from "../utils/auth.js";
@@ -6,7 +7,17 @@ function Navbar() {
     const { cartItems, clearCart } = useCart();
     const navigate = useNavigate();
     const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
-    const isLoggedIn = !!getAccessToken();
+    const [isLoggedIn, setIsLoggedIn] = useState(() => !!getAccessToken());
+
+    useEffect(() => {
+        const updateAuthentication = () => setIsLoggedIn(!!getAccessToken());
+        window.addEventListener("auth-change", updateAuthentication);
+        window.addEventListener("storage", updateAuthentication);
+        return () => {
+            window.removeEventListener("auth-change", updateAuthentication);
+            window.removeEventListener("storage", updateAuthentication);
+        };
+    }, []);
 
     const handleLogout = () => {
         clearTokens();
@@ -31,6 +42,7 @@ function Navbar() {
                         </>
                     ) : (
                         <>
+                            <Link to="/profile" className="hover:text-slate-900">Profile</Link>
                             <Link to="/orders" className="hover:text-slate-900">Orders</Link>
                             <button onClick={handleLogout} className="hover:text-slate-900">Logout</button>
                         </>

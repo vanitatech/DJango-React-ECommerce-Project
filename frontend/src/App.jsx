@@ -8,6 +8,7 @@ import PrivateRouter from './components/PrivateRouter';
 import Login from './Pages/Login';
 import Signup from './Pages/Signup';
 import OrderHistory from './Pages/OrderHistory';
+import ProfilePage from './Pages/ProfilePage';
 
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
         <Route element={<PrivateRouter />}>
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrderHistory />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
