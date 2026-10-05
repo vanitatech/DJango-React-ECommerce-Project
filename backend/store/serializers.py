@@ -5,6 +5,8 @@ from .models import (
     Cart,
     CartItem,
     Category,
+    ContentBlock,
+    ContentPage,
     Order,
     OrderItem,
     Product,
@@ -183,6 +185,41 @@ class OrderFulfilmentSerializer(serializers.Serializer):
                 "Orders can only move from processing to shipped, then delivered."
             )
         return attrs
+
+
+class ContentBlockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContentBlock
+        fields = [
+            "id",
+            "name",
+            "kind",
+            "heading",
+            "body",
+            "image_url",
+            "image_alt",
+            "button_label",
+            "button_url",
+        ]
+
+
+class ContentPageSerializer(serializers.ModelSerializer):
+    sections = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ContentPage
+        fields = ["title", "slug", "seo_description", "published_at", "sections"]
+
+    def get_sections(self, page):
+        blocks = (
+            ContentBlock.objects.filter(
+                page_placements__page=page,
+                is_active=True,
+            )
+            .order_by("page_placements__position", "page_placements__id")
+            .distinct()
+        )
+        return ContentBlockSerializer(blocks, many=True).data
 
 
 class GuestOrderItemSerializer(serializers.Serializer):

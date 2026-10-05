@@ -16,6 +16,7 @@ from .models import (
     Cart,
     CartItem,
     Category,
+    ContentPage,
     Order,
     OrderItem,
     Product,
@@ -27,6 +28,7 @@ from .serializers import (
     CartItemSerializer,
     CartSerializer,
     CategorySerializer,
+    ContentPageSerializer,
     GuestOrderItemSerializer,
     OrderSerializer,
     OrderFulfilmentSerializer,
@@ -189,6 +191,30 @@ def get_categories(request):
     categories = Category.objects.all().order_by("name")
     serializer = CategorySerializer(categories, many=True)
     return Response(serializer.data)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def list_published_pages(request):
+    pages = ContentPage.objects.filter(is_published=True).order_by("title")
+    return Response(
+        [
+            {"title": page.title, "slug": page.slug}
+            for page in pages
+        ]
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_published_page(request, slug):
+    try:
+        page = ContentPage.objects.prefetch_related(
+            "content_sections__block"
+        ).get(slug=slug, is_published=True)
+    except ContentPage.DoesNotExist:
+        return Response({"error": "Page not found."}, status=status.HTTP_404_NOT_FOUND)
+    return Response(ContentPageSerializer(page).data)
 
 
 @api_view(["GET"])

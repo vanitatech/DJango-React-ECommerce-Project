@@ -168,6 +168,8 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 /api/orders/<id>/cancel/
 /api/admin/orders/ # Staff-only searchable order queue (status/search filters)
 /api/admin/orders/<id>/ # Staff-only fulfilment updates (PATCH)
+/api/content/pages/ # Public list of published CMS pages
+/api/content/pages/<slug>/ # Public page content and active reusable sections
 /api/payments/config/
 /api/payments/stripe/webhook/
 /api/profile/
@@ -189,7 +191,22 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 - Added a private, persistent wishlist for each customer account
 - Added a staff-only order fulfilment queue with guarded shipping transitions,
   optional carrier/tracking details, and customer-visible delivery updates
+- Added reusable banner, text, and image content blocks with staff-managed
+  publishing and public, read-only CMS pages
 - Strengthened the project story for portfolio and recruiter review
+
+### Managing storefront content
+
+Staff can create reusable content blocks at `/admin/store/contentblock/`, then
+create a page at `/admin/store/contentpage/` and attach blocks in display order.
+Save a page as a draft until it is ready, then enable **Is published** to make it
+appear in the storefront information links. Disabling publication removes it
+from public page endpoints.
+
+Content is plain text rather than authored HTML. Image blocks require HTTPS
+image URLs, and buttons accept only HTTPS destinations or same-site paths; this
+keeps the generic page renderer from executing staff-entered markup or unsafe
+link schemes.
 
 ## Remaining roadmap
 
@@ -215,10 +232,10 @@ phase is complete; the next planned feature is content management:
 7. **Complete: admin order management and fulfilment tools**, including a
    staff-only searchable work queue, forward-only status transitions,
    fulfilment and tracking details, and customer-visible order updates.
-8. **Add CMS capabilities** after the preceding planned phases, so authorized
-   staff can manage pages and reusable content such as banners and page sections
-   without editing frontend code. Define publishing and content-safety
-   requirements as part of that phase.
+8. **Complete: CMS capabilities** for staff to manage published pages and
+   reusable banner, text, and image sections through Django admin. Public
+   endpoints expose published pages only; content is rendered as escaped text,
+   and links are restricted to HTTPS or same-site paths.
 
 ## License
 

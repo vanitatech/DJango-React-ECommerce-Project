@@ -2,8 +2,11 @@ from django.contrib import admin
 
 from .models import (
     Category,
+    ContentBlock,
+    ContentPage,
     Order,
     OrderItem,
+    PageContentBlock,
     Product,
     ProductImage,
     Review,
@@ -31,6 +34,35 @@ class OrderItemInline(admin.TabularInline):
     extra = 0
     readonly_fields = ('product', 'product_name', 'quantity', 'price')
     can_delete = False
+
+
+class PageContentBlockInline(admin.TabularInline):
+    model = PageContentBlock
+    extra = 1
+    autocomplete_fields = ("block",)
+    ordering = ("position", "id")
+
+
+@admin.register(ContentPage)
+class ContentPageAdmin(admin.ModelAdmin):
+    list_display = ("title", "slug", "is_published", "published_at", "updated_at")
+    list_filter = ("is_published", "updated_at")
+    search_fields = ("title", "slug", "seo_description")
+    prepopulated_fields = {"slug": ("title",)}
+    list_editable = ("is_published",)
+    inlines = [PageContentBlockInline]
+
+    @admin.display(description="Sections")
+    def section_count(self, obj):
+        return obj.content_sections.count()
+
+
+@admin.register(ContentBlock)
+class ContentBlockAdmin(admin.ModelAdmin):
+    list_display = ("name", "kind", "is_active")
+    list_filter = ("kind", "is_active")
+    search_fields = ("name", "heading", "body")
+    list_editable = ("is_active",)
 
 
 @admin.register(Order)

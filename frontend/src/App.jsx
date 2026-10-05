@@ -12,6 +12,8 @@ import OrderHistory from './Pages/OrderHistory';
 import ProfilePage from './Pages/ProfilePage';
 import WishlistPage from './Pages/WishlistPage';
 import AdminOrders from './Pages/AdminOrders';
+import ContentPage from './Pages/ContentPage';
+import ContentFooter from './components/ContentFooter';
 
 
 function App() {
@@ -24,6 +26,7 @@ function App() {
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/checkout/return" element={<CheckoutReturnPage />} />
+        <Route path="/pages/:slug" element={<ContentPage />} />
         <Route element={<PrivateRouter />}>
           <Route path="/orders" element={<OrderHistory />} />
           <Route path="/profile" element={<ProfilePage />} />
@@ -33,6 +36,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
       </Routes>
+      <ContentFooter />
     </Router>
    
   );

@@ -1,7 +1,17 @@
 from django.db import models
 
 from django.contrib.auth.models import User
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
+from django.utils import timezone
+
+
+def validate_content_link(value):
+    if not value:
+        return
+    if value.startswith("/") and not value.startswith("//") and "\\" not in value:
+        return
+    URLValidator(schemes=["https"])(value)
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -35,6 +45,98 @@ class ProductImage(models.Model):
 
     def __str__(self):
         return f"Image {self.position + 1} for {self.product.name}"
+
+
+class ContentPage(models.Model):
+    title = models.CharField(max_length=150)
+    slug = models.SlugField(max_length=150, unique=True)
+    seo_description = models.CharField(max_length=200, blank=True)
+    is_published = models.BooleanField(default=False)
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["title"]
+
+    def save(self, *args, **kwargs):
+        if self.is_published and self.published_at is None:
+            self.published_at = timezone.now()
+        elif not self.is_published:
+            self.published_at = None
+        if kwargs.get("update_fields") is not None and "is_published" in kwargs["update_fields"]:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {"published_at"}
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.title
+
+
+class ContentBlock(models.Model):
+    class Kind(models.TextChoices):
+        BANNER = "BANNER", "Banner"
+        TEXT = "TEXT", "Text"
+        IMAGE = "IMAGE", "Image"
+
+    name = models.CharField(max_length=100, unique=True)
+    kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.TEXT)
+    heading = models.CharField(max_length=200, blank=True)
+    body = models.TextField(blank=True)
+    image_url = models.URLField(
+        blank=True,
+        validators=[URLValidator(schemes=["https"])],
+    )
+    image_alt = models.CharField(max_length=200, blank=True)
+    button_label = models.CharField(max_length=60, blank=True)
+    button_url = models.CharField(
+        max_length=500,
+        blank=True,
+        validators=[validate_content_link],
+    )
+    is_active = models.BooleanField(default=True)
+    pages = models.ManyToManyField(
+        ContentPage,
+        through="PageContentBlock",
+        related_name="content_blocks",
+    )
+
+    def clean(self):
+        super().clean()
+        if bool(self.button_label) != bool(self.button_url):
+            raise ValidationError(
+                "Provide both the button label and destination, or leave both blank."
+            )
+        if self.kind == self.Kind.IMAGE and not self.image_url:
+            raise ValidationError({"image_url": "Image blocks require an HTTPS image URL."})
+
+    def __str__(self):
+        return self.name
+
+
+class PageContentBlock(models.Model):
+    page = models.ForeignKey(
+        ContentPage,
+        related_name="content_sections",
+        on_delete=models.CASCADE,
+    )
+    block = models.ForeignKey(
+        ContentBlock,
+        related_name="page_placements",
+        on_delete=models.PROTECT,
+    )
+    position = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["page", "block"],
+                name="unique_content_block_per_page",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.block.name} on {self.page.title}"
 
 
 class UserProfile(models.Model):
@@ -166,5 +268,3 @@ class CartItem(models.Model):
     @property
     def subtotal(self):
         return self.quantity * self.product.price
-
-
