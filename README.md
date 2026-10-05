@@ -221,8 +221,9 @@ phase is complete; the next planned feature is content management:
    Checkout/webhook smoke test. Live keys are explicitly rejected.
 3. **Complete: expand automated coverage** for authentication, APIs, and
    authenticated and guest customer journeys.
-4. **Revisit deployment and CI** (Docker or a cloud deployment). This phase is
-   deferred while the focus remains on improving the software itself.
+4. **Complete: automated CI checks** for backend configuration, tests and
+   migration consistency plus frontend lint and production builds. Cloud
+   deployment remains a separate future decision.
 5. **Complete: support multiple product images** with a browsable product
    gallery and manageable image ordering, while preserving each product’s
    existing primary image.
