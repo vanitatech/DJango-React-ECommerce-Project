@@ -120,6 +120,21 @@ events mark orders paid; expiration releases the reserved stock.
 Paid card orders cannot be cancelled through the standard cancellation endpoint
 because a refund must be issued first.
 
+### Backend tests
+
+Run the API and customer-journey test suite with:
+
+```bash
+cd backend
+python3 manage.py test store
+```
+
+The automated suite covers registration, JWT issue and refresh, private API
+permissions, authenticated and guest purchase journeys, order history and
+cancellation, inventory handling, and Stripe session/webhook lifecycle behavior.
+Stripe network calls are mocked in tests; use the Stripe CLI instructions above
+for a real sandbox smoke test.
+
 ### 2) Frontend
 
 ```bash
@@ -184,8 +199,9 @@ management and content management:
    verification and inventory release on session expiry. A sandbox smoke test
    still requires the developer's own Stripe test credentials and Stripe CLI;
    live keys are explicitly rejected.
-3. **Expand automated coverage** for authentication, APIs, and end-to-end
-   customer journeys.
+3. **Complete: expand automated coverage** for authentication, APIs, and
+   authenticated and guest customer journeys. A real Stripe sandbox smoke test
+   remains dependent on developer-owned test credentials.
 4. **Revisit deployment and CI** (Docker or a cloud deployment). This phase is
    deferred while the focus remains on improving the software itself.
 5. **Complete: support multiple product images** with a browsable product
