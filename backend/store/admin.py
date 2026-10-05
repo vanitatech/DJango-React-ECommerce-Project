@@ -40,6 +40,10 @@ class OrderAdmin(admin.ModelAdmin):
         'user',
         'status',
         'payment_status',
+        'carrier',
+        'tracking_number',
+        'shipped_at',
+        'delivered_at',
         'total_amount',
         'payment_method',
         'created_at',
@@ -58,14 +62,13 @@ class OrderAdmin(admin.ModelAdmin):
         'payment_status',
         'stripe_session_id',
         'stripe_checkout_url',
+        'status',
+        'carrier',
+        'tracking_number',
+        'shipped_at',
+        'delivered_at',
     )
     inlines = [OrderItemInline]
-
-    def get_readonly_fields(self, request, obj=None):
-        readonly_fields = super().get_readonly_fields(request, obj)
-        if obj and obj.payment_status == Order.PaymentStatus.PENDING:
-            return (*readonly_fields, 'status')
-        return readonly_fields
 
 
 @admin.register(Review)

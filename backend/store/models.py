@@ -83,6 +83,10 @@ class Order(models.Model):
         max_length=255, blank=True, null=True, unique=True
     )
     stripe_checkout_url = models.URLField(blank=True)
+    carrier = models.CharField(max_length=100, blank=True)
+    tracking_number = models.CharField(max_length=100, blank=True)
+    shipped_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.PROCESSING
     )
@@ -162,6 +166,5 @@ class CartItem(models.Model):
     @property
     def subtotal(self):
         return self.quantity * self.product.price
-
 
 

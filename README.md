@@ -166,6 +166,8 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 /api/orders/
 /api/orders/payment-status/?session_id=<stripe-session-id>
 /api/orders/<id>/cancel/
+/api/admin/orders/ # Staff-only searchable order queue (status/search filters)
+/api/admin/orders/<id>/ # Staff-only fulfilment updates (PATCH)
 /api/payments/config/
 /api/payments/stripe/webhook/
 /api/profile/
@@ -185,23 +187,23 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 - Added stock tracking, order history, and product reviews
 - Added account contact details and safe order cancellation with inventory restoration
 - Added a private, persistent wishlist for each customer account
+- Added a staff-only order fulfilment queue with guarded shipping transitions,
+  optional carrier/tracking details, and customer-visible delivery updates
 - Strengthened the project story for portfolio and recruiter review
 
 ## Remaining roadmap
 
-Multi-image product galleries and guest checkout are complete. Continue the
-remaining customer-facing and quality phases before beginning admin order
-management and content management:
+The Stripe sandbox smoke test, customer-facing checkout work, product galleries,
+guest checkout, and expanded journey coverage are complete. The admin fulfilment
+phase is complete; the next planned feature is content management:
 
 1. **Continue storefront improvements** with customer-facing shopping and account
    flows.
-2. **Implemented: Stripe Checkout in test mode** with signed webhook
-   verification and inventory release on session expiry. A sandbox smoke test
-   still requires the developer's own Stripe test credentials and Stripe CLI;
-   live keys are explicitly rejected.
+2. **Complete: Stripe Checkout in test mode** with signed webhook verification,
+   inventory release on session expiry, and a successful Stripe sandbox
+   Checkout/webhook smoke test. Live keys are explicitly rejected.
 3. **Complete: expand automated coverage** for authentication, APIs, and
-   authenticated and guest customer journeys. A real Stripe sandbox smoke test
-   remains dependent on developer-owned test credentials.
+   authenticated and guest customer journeys.
 4. **Revisit deployment and CI** (Docker or a cloud deployment). This phase is
    deferred while the focus remains on improving the software itself.
 5. **Complete: support multiple product images** with a browsable product
@@ -210,10 +212,9 @@ management and content management:
 6. **Complete: add guest checkout** so customers can place orders without
    creating an account, with a persistent guest cart, clear order confirmation,
    and an optional account-creation path.
-7. **Add admin order management and fulfilment tools** after the preceding
-   planned phases. Scope includes a searchable order work queue, clear status
-   transitions, fulfilment and tracking details, and visibility into order
-   history.
+7. **Complete: admin order management and fulfilment tools**, including a
+   staff-only searchable work queue, forward-only status transitions,
+   fulfilment and tracking details, and customer-visible order updates.
 8. **Add CMS capabilities** after the preceding planned phases, so authorized
    staff can manage pages and reusable content such as banners and page sections
    without editing frontend code. Define publishing and content-safety

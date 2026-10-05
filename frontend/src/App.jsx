@@ -11,6 +11,7 @@ import Signup from './Pages/Signup';
 import OrderHistory from './Pages/OrderHistory';
 import ProfilePage from './Pages/ProfilePage';
 import WishlistPage from './Pages/WishlistPage';
+import AdminOrders from './Pages/AdminOrders';
 
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
           <Route path="/orders" element={<OrderHistory />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/wishlist" element={<WishlistPage />} />
+          <Route path="/admin/orders" element={<AdminOrders />} />
         </Route>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />

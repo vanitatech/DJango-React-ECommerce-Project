@@ -4,11 +4,12 @@ from decimal import Decimal
 import stripe
 from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from .models import (
@@ -28,6 +29,7 @@ from .serializers import (
     CategorySerializer,
     GuestOrderItemSerializer,
     OrderSerializer,
+    OrderFulfilmentSerializer,
     ProductSerializer,
     RegisterSerializer,
     ReviewSerializer,
@@ -567,6 +569,79 @@ def get_orders(request):
         .order_by("-created_at")
     )
     return Response(OrderSerializer(orders, many=True).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def admin_order_queue(request):
+    orders = Order.objects.select_related("user").prefetch_related("items")
+    order_status = request.query_params.get("status", "").strip()
+    query = request.query_params.get("search", "").strip()
+
+    if order_status:
+        if order_status not in Order.Status.values:
+            return Response(
+                {"error": "Choose a valid order status."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        orders = orders.filter(status=order_status)
+
+    if query:
+        orders = orders.filter(
+            Q(customer_name__icontains=query)
+            | Q(customer_email__icontains=query)
+            | Q(phone__icontains=query)
+            | Q(user__username__icontains=query)
+            | Q(pk__icontains=query)
+        )
+
+    orders = orders.order_by("-created_at", "-pk")
+    return Response(OrderSerializer(orders, many=True).data)
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAdminUser])
+@transaction.atomic
+def update_order_fulfilment(request, pk):
+    try:
+        order = Order.objects.select_for_update().get(pk=pk)
+    except Order.DoesNotExist:
+        return Response(
+            {"error": "Order not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    serializer = OrderFulfilmentSerializer(
+        order,
+        data=request.data,
+        partial=True,
+    )
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    changes = serializer.validated_data
+    next_status = changes.get("status", order.status)
+    update_fields = []
+
+    for field in ("carrier", "tracking_number"):
+        if field in changes:
+            setattr(order, field, changes[field])
+            update_fields.append(field)
+
+    if next_status != order.status:
+        order.status = next_status
+        update_fields.append("status")
+        if next_status == Order.Status.SHIPPED:
+            order.shipped_at = timezone.now()
+            update_fields.append("shipped_at")
+        elif next_status == Order.Status.DELIVERED:
+            order.delivered_at = timezone.now()
+            update_fields.append("delivered_at")
+
+    if update_fields:
+        order.save(update_fields=update_fields)
+
+    return Response(OrderSerializer(order).data)
 
 
 @api_view(["GET"])

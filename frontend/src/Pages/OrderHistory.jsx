@@ -173,6 +173,15 @@ function OrderHistory() {
                                         ({order.payment_status.replaceAll("_", " ").toLowerCase()})
                                     </p>
                                 </div>
+                                {(order.carrier || order.tracking_number || order.shipped_at || order.delivered_at) && (
+                                    <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm">
+                                        <p className="font-semibold text-slate-800">Delivery updates</p>
+                                        {order.carrier && <p className="mt-1 text-slate-600">Carrier: {order.carrier}</p>}
+                                        {order.tracking_number && <p className="text-slate-600">Tracking number: {order.tracking_number}</p>}
+                                        {order.shipped_at && <p className="mt-1 text-slate-500">Shipped {new Date(order.shipped_at).toLocaleString()}</p>}
+                                        {order.delivered_at && <p className="text-slate-500">Delivered {new Date(order.delivered_at).toLocaleString()}</p>}
+                                    </div>
+                                )}
                             </article>
                         ))}
                     </div>

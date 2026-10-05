@@ -15,6 +15,12 @@ urlpatterns = [
     path('cart/update/', views.update_cart_quantity),
     path('orders/create/', views.create_order, name='create_order'),
     path('orders/', views.get_orders, name='get_orders'),
+    path('admin/orders/', views.admin_order_queue, name='admin_order_queue'),
+    path(
+        'admin/orders/<int:pk>/',
+        views.update_order_fulfilment,
+        name='update_order_fulfilment',
+    ),
     path('orders/payment-status/', views.stripe_payment_status, name='stripe_payment_status'),
     path('orders/<int:pk>/cancel/', views.cancel_order, name='cancel_order'),
     path('payments/config/', views.payment_config, name='payment_config'),

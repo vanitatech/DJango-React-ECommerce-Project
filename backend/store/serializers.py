@@ -128,10 +128,61 @@ class OrderSerializer(serializers.ModelSerializer):
             "payment_method",
             "payment_status",
             "status",
+            "carrier",
+            "tracking_number",
+            "shipped_at",
+            "delivered_at",
             "checkout_url",
             "items",
         ]
         read_only_fields = fields
+
+
+class OrderFulfilmentSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=[Order.Status.SHIPPED, Order.Status.DELIVERED],
+        required=False,
+    )
+    carrier = serializers.CharField(max_length=100, allow_blank=True, required=False)
+    tracking_number = serializers.CharField(
+        max_length=100, allow_blank=True, required=False
+    )
+
+    def validate(self, attrs):
+        order = self.instance
+        if order.status not in {Order.Status.PROCESSING, Order.Status.SHIPPED}:
+            raise serializers.ValidationError(
+                "Only processing or shipped orders can be updated for fulfilment."
+            )
+        if (
+            order.payment_method == Order.PaymentMethod.CARD
+            and order.payment_status
+            not in {Order.PaymentStatus.PAID, Order.PaymentStatus.SIMULATED}
+        ):
+            raise serializers.ValidationError(
+                "Card payment must be complete before fulfilment."
+            )
+
+        carrier = attrs.get("carrier", order.carrier)
+        tracking_number = attrs.get("tracking_number", order.tracking_number)
+        if bool(carrier) != bool(tracking_number):
+            raise serializers.ValidationError(
+                "Provide both the carrier and tracking number, or leave both blank."
+            )
+
+        next_status = attrs.get("status", order.status)
+        if (
+            next_status != order.status
+            and (order.status, next_status)
+            not in {
+                (Order.Status.PROCESSING, Order.Status.SHIPPED),
+                (Order.Status.SHIPPED, Order.Status.DELIVERED),
+            }
+        ):
+            raise serializers.ValidationError(
+                "Orders can only move from processing to shipped, then delivered."
+            )
+        return attrs
 
 
 class GuestOrderItemSerializer(serializers.Serializer):
@@ -142,10 +193,11 @@ class GuestOrderItemSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     email = serializers.EmailField(source="user.email")
+    is_staff = serializers.BooleanField(source="user.is_staff", read_only=True)
 
     class Meta:
         model = UserProfile
-        fields = ["username", "email", "phone", "address"]
+        fields = ["username", "email", "phone", "address", "is_staff"]
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop("user", {})

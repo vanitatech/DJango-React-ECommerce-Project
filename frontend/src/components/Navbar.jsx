@@ -1,19 +1,44 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/useCart.js";
-import { clearTokens, getAccessToken } from "../utils/auth.js";
+import { authFetch, clearTokens, getAccessToken } from "../utils/auth.js";
 
 function Navbar() {
     const { cartItems } = useCart();
     const navigate = useNavigate();
     const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
     const [isLoggedIn, setIsLoggedIn] = useState(() => !!getAccessToken());
+    const [isStaff, setIsStaff] = useState(false);
+    const [staffCheckError, setStaffCheckError] = useState("");
 
     useEffect(() => {
-        const updateAuthentication = () => setIsLoggedIn(!!getAccessToken());
+        let active = true;
+        const updateAuthentication = async () => {
+            const authenticated = !!getAccessToken();
+            setIsLoggedIn(authenticated);
+            setIsStaff(false);
+            setStaffCheckError("");
+            if (!authenticated) return;
+
+            try {
+                const response = await authFetch(
+                    `${import.meta.env.VITE_DJANGO_BASE_URL}/api/profile/`,
+                );
+                if (!response.ok) {
+                    throw new Error("Unable to verify staff access.");
+                }
+                const profile = await response.json();
+                if (active) setIsStaff(profile.is_staff);
+            } catch (error) {
+                if (active) setStaffCheckError(error.message);
+            }
+        };
+
         window.addEventListener("auth-change", updateAuthentication);
         window.addEventListener("storage", updateAuthentication);
+        void updateAuthentication();
         return () => {
+            active = false;
             window.removeEventListener("auth-change", updateAuthentication);
             window.removeEventListener("storage", updateAuthentication);
         };
@@ -44,9 +69,11 @@ function Navbar() {
                             <Link to="/profile" className="hover:text-slate-900">Profile</Link>
                             <Link to="/orders" className="hover:text-slate-900">Orders</Link>
                             <Link to="/wishlist" className="hover:text-slate-900">Saved</Link>
+                            {isStaff && <Link to="/admin/orders" className="hover:text-slate-900">Admin orders</Link>}
                             <button onClick={handleLogout} className="hover:text-slate-900">Logout</button>
                         </>
                     )}
+                    {staffCheckError && <span role="alert" className="text-xs text-red-600">{staffCheckError}</span>}
 
                     <Link to="/cart" className="relative inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 hover:border-slate-300">
                         <span>Cart</span>
