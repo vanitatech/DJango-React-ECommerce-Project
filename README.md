@@ -56,6 +56,8 @@ This app demonstrates:
 - Demo catalog seeding with distinct product imagery
 - Responsive storefront UI for mobile and desktop
 
+![VanitaCart storefront with searchable, filterable product cards](./docs/screenshots/storefront.png)
+
 ## Project structure
 
 ```text
@@ -219,11 +221,15 @@ with a staff account and use its **Preview** link in Django admin. Set
 **Is published** and a future **Published at** time to schedule a page; it will
 become public automatically at that time without a background worker.
 
+![Published storefront content rendered from reusable CMS blocks](./docs/screenshots/cms-page.png)
+
 Guest tracking links act as bearer credentials: anyone with the complete link
 can see the order's status, items, total, and shipment tracking fields. The
 database stores only a SHA-256 digest of a random token, and the tracking API
 does not expose guest email, phone, or delivery address. Ask customers to keep
 the link private.
+
+![Guest order tracking with shipment updates and order details](./docs/screenshots/guest-order-tracking.png)
 
 The operations dashboard appears on the Django admin home page at `/admin/`.
 It counts orders by status, shows orders placed today, and totals confirmed
@@ -233,6 +239,8 @@ The dashboard and the product, order, and CMS tools share Django admin
 authentication; visit `http://localhost:8000/admin/` and sign in with a staff
 account. The customer-facing React app does not contain a separate staff
 dashboard.
+
+![Django admin operations dashboard with order status and low-stock summaries](./docs/screenshots/admin-dashboard.png)
 
 ## Remaining roadmap
 
