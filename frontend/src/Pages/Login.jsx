@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { saveTokens } from '../utils/auth';
 
 function Login() {
@@ -7,6 +7,7 @@ function Login() {
     const [form, setForm] = useState({ username: '', password: '' });
     const [msg, setMsg] = useState('');
     const navigate = useNavigate();
+    const location = useLocation();
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -28,13 +29,17 @@ function Login() {
                 saveTokens(data);
                 setMsg('Login Successful! Redirecting...');
                 setTimeout(() => {
-                    navigate('/'); // Redirect to home page after successful login
+                    const destination = location.state?.from;
+                    const returnTo = destination
+                        ? `${destination.pathname}${destination.search || ''}${destination.hash || ''}`
+                        : '/';
+                    navigate(returnTo, { replace: true });
                 }, 800);
             }
             else {
                 setMsg(data.detail || 'Login failed. Please try again.');
             }
-        } catch (error) {
+        } catch {
             setMsg('An error occurred. Please try again later.');
         }
     };

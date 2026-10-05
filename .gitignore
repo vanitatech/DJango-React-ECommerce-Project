@@ -1,0 +1,54 @@
+# Environment-specific configuration and secrets
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+.vev/
+venv/
+env/
+ENV/
+pip-wheel-metadata/
+*.egg-info/
+
+# Django and local databases/uploads
+*.sqlite3
+*.sqlite3-journal
+*.db
+media/
+staticfiles/
+
+# Node.js and frontend build output
+node_modules/
+dist/
+dist-ssr/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test, type-checker, and tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.vite/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
