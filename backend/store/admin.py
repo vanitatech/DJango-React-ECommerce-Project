@@ -1,4 +1,8 @@
 from django.contrib import admin
+from django.conf import settings
+from django.utils import timezone
+from django.utils.html import format_html
+from urllib.parse import quote
 
 from .models import (
     Category,
@@ -45,16 +49,47 @@ class PageContentBlockInline(admin.TabularInline):
 
 @admin.register(ContentPage)
 class ContentPageAdmin(admin.ModelAdmin):
-    list_display = ("title", "slug", "is_published", "published_at", "updated_at")
+    list_display = (
+        "title",
+        "slug",
+        "publication_state",
+        "published_at",
+        "updated_at",
+        "preview_link",
+    )
     list_filter = ("is_published", "updated_at")
     search_fields = ("title", "slug", "seo_description")
     prepopulated_fields = {"slug": ("title",)}
-    list_editable = ("is_published",)
+    fields = (
+        "title",
+        "slug",
+        "seo_description",
+        "is_published",
+        "published_at",
+        "created_at",
+        "updated_at",
+    )
+    readonly_fields = ("created_at", "updated_at")
     inlines = [PageContentBlockInline]
 
-    @admin.display(description="Sections")
-    def section_count(self, obj):
-        return obj.content_sections.count()
+    @admin.display(description="Publication", ordering="is_published")
+    def publication_state(self, obj):
+        if not obj.is_published:
+            return "Draft"
+        if obj.published_at and obj.published_at > timezone.now():
+            return "Scheduled"
+        return "Published"
+
+    @admin.display(description="Preview")
+    def preview_link(self, obj):
+        url = (
+            f"{settings.FRONTEND_URL.rstrip('/')}/admin/content/"
+            f"{quote(obj.slug, safe='')}/preview"
+        )
+        return format_html(
+            '<a href="{}" target="_blank" rel="noopener noreferrer">Preview</a>',
+            url,
+        )
 
 
 @admin.register(ContentBlock)

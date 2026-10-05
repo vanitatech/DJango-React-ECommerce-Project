@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.utils import timezone
 from rest_framework import serializers
 
 from .models import (
@@ -187,6 +188,24 @@ class OrderFulfilmentSerializer(serializers.Serializer):
         return attrs
 
 
+class GuestOrderTrackingSerializer(serializers.ModelSerializer):
+    items = OrderItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            "id",
+            "created_at",
+            "total_amount",
+            "status",
+            "carrier",
+            "tracking_number",
+            "shipped_at",
+            "delivered_at",
+            "items",
+        ]
+
+
 class ContentBlockSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContentBlock
@@ -205,10 +224,26 @@ class ContentBlockSerializer(serializers.ModelSerializer):
 
 class ContentPageSerializer(serializers.ModelSerializer):
     sections = serializers.SerializerMethodField()
+    publication_state = serializers.SerializerMethodField()
 
     class Meta:
         model = ContentPage
-        fields = ["title", "slug", "seo_description", "published_at", "sections"]
+        fields = [
+            "title",
+            "slug",
+            "seo_description",
+            "is_published",
+            "published_at",
+            "publication_state",
+            "sections",
+        ]
+
+    def get_publication_state(self, page):
+        if not page.is_published:
+            return "draft"
+        if page.published_at and page.published_at > timezone.now():
+            return "scheduled"
+        return "published"
 
     def get_sections(self, page):
         blocks = (

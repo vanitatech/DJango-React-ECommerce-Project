@@ -93,6 +93,16 @@ function CheckoutReturnPage() {
                         <p className="mt-3 text-slate-700">Order <strong>#{paymentResult.order.order_id}</strong> is confirmed.</p>
                         <p className="mt-1 text-lg font-bold text-slate-900">Total: ${Number(paymentResult.order.total).toFixed(2)}</p>
                         <p className="mt-2 text-sm text-slate-600">A receipt will be sent by Stripe to the email used at checkout.</p>
+                        {paymentResult.order.order_id
+                            && sessionStorage.getItem(`guest_order_tracking_${paymentResult.order.order_id}`)
+                            && (
+                                <Link
+                                    to={`/orders/track/${encodeURIComponent(sessionStorage.getItem(`guest_order_tracking_${paymentResult.order.order_id}`))}`}
+                                    className="mt-5 inline-flex rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white hover:bg-indigo-700"
+                                >
+                                    Track this order
+                                </Link>
+                            )}
                     </>
                 )}
                 {paymentResult.state === "failed" && (

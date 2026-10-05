@@ -164,12 +164,15 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 /api/cart/update/
 /api/orders/create/
 /api/orders/
+/api/orders/track/ # POST { "token": "<private guest tracking token>" }
 /api/orders/payment-status/?session_id=<stripe-session-id>
 /api/orders/<id>/cancel/
 /api/admin/orders/ # Staff-only searchable order queue (status/search filters)
 /api/admin/orders/<id>/ # Staff-only fulfilment updates (PATCH)
+/api/admin/operations/summary/ # Staff-only daily metrics and low-stock alerts
 /api/content/pages/ # Public list of published CMS pages
 /api/content/pages/<slug>/ # Public page content and active reusable sections
+/api/admin/content/pages/<slug>/preview/ # Staff-only draft/scheduled preview
 /api/payments/config/
 /api/payments/stripe/webhook/
 /api/profile/
@@ -191,8 +194,14 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 - Added a private, persistent wishlist for each customer account
 - Added a staff-only order fulfilment queue with guarded shipping transitions,
   optional carrier/tracking details, and customer-visible delivery updates
+- Added private guest order tracking links backed by hashed, high-entropy
+  tokens and a limited order-status response
+- Added a staff operations overview for order status, today's confirmed card
+  revenue, and low-stock products
 - Added reusable banner, text, and image content blocks with staff-managed
-  publishing and public, read-only CMS pages
+  publishing, staff-only previews, scheduled publication, and public,
+  read-only CMS pages
+- Added GitHub Actions CI for backend tests/checks and frontend lint/build
 - Strengthened the project story for portfolio and recruiter review
 
 ### Managing storefront content
@@ -206,7 +215,21 @@ from public page endpoints.
 Content is plain text rather than authored HTML. Image blocks require HTTPS
 image URLs, and buttons accept only HTTPS destinations or same-site paths; this
 keeps the generic page renderer from executing staff-entered markup or unsafe
-link schemes.
+link schemes. To preview a draft or scheduled page, sign in to the storefront
+with a staff account and use its **Preview** link in Django admin. Set
+**Is published** and a future **Published at** time to schedule a page; it will
+become public automatically at that time without a background worker.
+
+Guest tracking links act as bearer credentials: anyone with the complete link
+can see the order's status, items, total, and shipment tracking fields. The
+database stores only a SHA-256 digest of a random token, and the tracking API
+does not expose guest email, phone, or delivery address. Ask customers to keep
+the link private.
+
+The operations dashboard counts orders by status, shows orders placed today,
+and totals confirmed Stripe card revenue for today. Cash-on-delivery and
+simulated payments are excluded from paid revenue. Low-stock alerts use a
+five-unit threshold.
 
 ## Remaining roadmap
 
@@ -235,8 +258,14 @@ phase is complete; the next planned feature is content management:
    fulfilment and tracking details, and customer-visible order updates.
 8. **Complete: CMS capabilities** for staff to manage published pages and
    reusable banner, text, and image sections through Django admin. Public
-   endpoints expose published pages only; content is rendered as escaped text,
-   and links are restricted to HTTPS or same-site paths.
+   endpoints expose published pages only; staff previews support drafts and
+   scheduled publication. Content is rendered as escaped text, and links are
+   restricted to HTTPS or same-site paths.
+9. **Complete: guest order tracking** through private random-token links, with
+   only a token digest stored and contact/address details omitted from lookup
+   responses.
+10. **Complete: staff operations dashboard** with order status totals, today's
+    order count, confirmed card revenue, and low-stock alerts.
 
 ## License
 

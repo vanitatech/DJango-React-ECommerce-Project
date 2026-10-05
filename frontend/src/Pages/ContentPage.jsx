@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { authFetch } from "../utils/auth.js";
 
 function ContentSection({ section }) {
     const image = section.image_url ? (
@@ -83,7 +84,7 @@ function ContentSection({ section }) {
     );
 }
 
-function ContentPage() {
+function ContentPage({ preview = false }) {
     const { slug } = useParams();
     const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
     const [page, setPage] = useState(null);
@@ -96,9 +97,11 @@ function ContentPage() {
             setLoading(true);
             setError("");
             try {
-                const response = await fetch(
-                    `${BASEURL}/api/content/pages/${encodeURIComponent(slug)}/`,
-                );
+                const previewPath = `/api/admin/content/pages/${encodeURIComponent(slug)}/preview/`;
+                const publicPath = `/api/content/pages/${encodeURIComponent(slug)}/`;
+                const response = preview
+                    ? await authFetch(`${BASEURL}${previewPath}`)
+                    : await fetch(`${BASEURL}${publicPath}`);
                 const data = await response.json();
                 if (!response.ok) {
                     throw new Error(data.error || "This page could not be found.");
@@ -118,7 +121,7 @@ function ContentPage() {
         return () => {
             active = false;
         };
-    }, [BASEURL, slug]);
+    }, [BASEURL, preview, slug]);
 
     useEffect(() => {
         if (page) document.title = `${page.title} | VanitaCart`;
@@ -145,6 +148,17 @@ function ContentPage() {
                 ) : (
                     <>
                         <header className="mb-8">
+                            {preview && (
+                                <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                    <strong>Staff preview · {page.publication_state}</strong>
+                                    {page.publication_state === "scheduled" && page.published_at && (
+                                        <span> · Goes live {new Date(page.published_at).toLocaleString()}</span>
+                                    )}
+                                    {page.publication_state === "draft" && (
+                                        <span> · This page is not visible to customers.</span>
+                                    )}
+                                </div>
+                            )}
                             <h1 className="text-4xl font-black tracking-tight text-slate-900">{page.title}</h1>
                             {page.seo_description && (
                                 <p className="mt-3 max-w-3xl text-lg text-slate-600">{page.seo_description}</p>

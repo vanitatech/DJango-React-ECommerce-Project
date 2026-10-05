@@ -52,7 +52,11 @@ class ContentPage(models.Model):
     slug = models.SlugField(max_length=150, unique=True)
     seo_description = models.CharField(max_length=200, blank=True)
     is_published = models.BooleanField(default=False)
-    published_at = models.DateTimeField(null=True, blank=True)
+    published_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Set a future time to schedule publication; leave blank to publish immediately.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -185,6 +189,13 @@ class Order(models.Model):
         max_length=255, blank=True, null=True, unique=True
     )
     stripe_checkout_url = models.URLField(blank=True)
+    guest_tracking_token_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        unique=True,
+        editable=False,
+    )
     carrier = models.CharField(max_length=100, blank=True)
     tracking_number = models.CharField(max_length=100, blank=True)
     shipped_at = models.DateTimeField(null=True, blank=True)

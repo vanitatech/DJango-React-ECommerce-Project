@@ -126,6 +126,12 @@ function CheckoutPage() {
                 if (!data.checkout_url) {
                     throw new Error("Stripe did not return a checkout link. Please contact support before retrying.");
                 }
+                if (data.guest_tracking_token) {
+                    sessionStorage.setItem(
+                        `guest_order_tracking_${data.order_id}`,
+                        data.guest_tracking_token,
+                    );
+                }
                 if (isAuthenticated) {
                     clearCart();
                 }
@@ -143,6 +149,7 @@ function CheckoutPage() {
                     id: data.order_id,
                     total: data.total,
                     email: form.email,
+                    trackingToken: data.guest_tracking_token,
                 });
             }
         } catch (error) {
@@ -179,6 +186,16 @@ function CheckoutPage() {
                         <p className="mt-2 text-sm text-slate-600">
                             Create an account for faster future checkouts. An account is not required for this order.
                         </p>
+                        {orderConfirmation.trackingToken && (
+                            <p className="mt-4">
+                                <Link
+                                    to={`/orders/track/${encodeURIComponent(orderConfirmation.trackingToken)}`}
+                                    className="font-semibold text-indigo-700 hover:underline"
+                                >
+                                    View order status and delivery updates
+                                </Link>
+                            </p>
+                        )}
                         <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
                             <Link
                                 to={`/signup?email=${encodeURIComponent(orderConfirmation.email)}`}

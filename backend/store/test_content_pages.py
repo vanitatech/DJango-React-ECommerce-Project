@@ -1,7 +1,13 @@
+from datetime import timedelta
+
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.utils.dateparse import parse_datetime
 from django.test import TestCase
+from django.utils import timezone
 from django.urls import reverse
 from rest_framework.test import APITestCase
+from unittest.mock import patch
 
 from .models import ContentBlock, ContentPage, PageContentBlock
 
@@ -107,6 +113,110 @@ class PublishedContentPageTests(APITestCase):
         page.is_published = False
         page.save(update_fields=["is_published"])
         self.assertIsNone(page.published_at)
+
+    def test_future_scheduled_pages_are_hidden_until_their_publication_time(self):
+        scheduled_at = timezone.now() + timedelta(days=1)
+        scheduled_page = ContentPage.objects.create(
+            title="Scheduled page",
+            slug="scheduled-page",
+            is_published=True,
+            published_at=scheduled_at,
+        )
+        PageContentBlock.objects.create(
+            page=scheduled_page,
+            block=self.banner,
+            position=0,
+        )
+
+        self.assertNotIn(
+            {"title": "Scheduled page", "slug": "scheduled-page"},
+            self.client.get(reverse("published_pages")).data,
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse("published_page", args=["scheduled-page"])
+            ).status_code,
+            404,
+        )
+
+        with patch("django.utils.timezone.now", return_value=scheduled_at + timedelta(seconds=1)):
+            published_list = self.client.get(reverse("published_pages"))
+            published_page = self.client.get(
+                reverse("published_page", args=["scheduled-page"])
+            )
+
+        self.assertIn(
+            {"title": "Scheduled page", "slug": "scheduled-page"},
+            published_list.data,
+        )
+        self.assertEqual(published_page.status_code, 200)
+        self.assertEqual(published_page.data["publication_state"], "published")
+
+
+class ContentPagePreviewTests(APITestCase):
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            username="cms-staff",
+            password="staff-password",
+            is_staff=True,
+        )
+        self.customer = User.objects.create_user(
+            username="cms-customer",
+            password="customer-password",
+        )
+        self.page = ContentPage.objects.create(
+            title="Preview only",
+            slug="preview-only",
+        )
+        self.block = ContentBlock.objects.create(
+            name="Draft page section",
+            heading="Visible only in preview",
+        )
+        PageContentBlock.objects.create(
+            page=self.page,
+            block=self.block,
+            position=0,
+        )
+
+    def test_draft_preview_is_staff_only_and_includes_page_sections(self):
+        preview_url = reverse("preview_content_page", args=[self.page.slug])
+        self.assertEqual(self.client.get(preview_url).status_code, 401)
+
+        self.client.force_authenticate(user=self.customer)
+        self.assertEqual(self.client.get(preview_url).status_code, 403)
+
+        self.client.force_authenticate(user=self.staff_user)
+        preview = self.client.get(preview_url)
+
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.data["publication_state"], "draft")
+        self.assertEqual(
+            preview.data["sections"][0]["heading"],
+            "Visible only in preview",
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse("published_page", args=[self.page.slug])
+            ).status_code,
+            404,
+        )
+
+    def test_scheduled_preview_shows_go_live_time(self):
+        self.page.is_published = True
+        self.page.published_at = timezone.now() + timedelta(days=1)
+        self.page.save(update_fields=["is_published", "published_at"])
+        self.client.force_authenticate(user=self.staff_user)
+
+        preview = self.client.get(
+            reverse("preview_content_page", args=[self.page.slug])
+        )
+
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.data["publication_state"], "scheduled")
+        self.assertEqual(
+            parse_datetime(preview.data["published_at"]),
+            self.page.published_at,
+        )
 
 
 class ContentBlockValidationTests(TestCase):

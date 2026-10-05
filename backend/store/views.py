@@ -1,10 +1,13 @@
 import logging
+import hashlib
+import re
+import secrets
 from decimal import Decimal
 
 import stripe
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Count, Q, Sum
 from django.http import JsonResponse
 from django.utils import timezone
 from rest_framework import serializers, status
@@ -30,6 +33,7 @@ from .serializers import (
     CategorySerializer,
     ContentPageSerializer,
     GuestOrderItemSerializer,
+    GuestOrderTrackingSerializer,
     OrderSerializer,
     OrderFulfilmentSerializer,
     ProductSerializer,
@@ -196,7 +200,10 @@ def get_categories(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def list_published_pages(request):
-    pages = ContentPage.objects.filter(is_published=True).order_by("title")
+    pages = ContentPage.objects.filter(
+        is_published=True,
+        published_at__lte=timezone.now(),
+    ).order_by("title")
     return Response(
         [
             {"title": page.title, "slug": page.slug}
@@ -211,7 +218,23 @@ def get_published_page(request, slug):
     try:
         page = ContentPage.objects.prefetch_related(
             "content_sections__block"
-        ).get(slug=slug, is_published=True)
+        ).get(
+            slug=slug,
+            is_published=True,
+            published_at__lte=timezone.now(),
+        )
+    except ContentPage.DoesNotExist:
+        return Response({"error": "Page not found."}, status=status.HTTP_404_NOT_FOUND)
+    return Response(ContentPageSerializer(page).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def preview_content_page(request, slug):
+    try:
+        page = ContentPage.objects.prefetch_related(
+            "content_sections__block"
+        ).get(slug=slug)
     except ContentPage.DoesNotExist:
         return Response({"error": "Page not found."}, status=status.HTTP_404_NOT_FOUND)
     return Response(ContentPageSerializer(page).data)
@@ -416,6 +439,9 @@ def create_order(request):
         for product_id, quantity in quantities.items()
     )
 
+    guest_tracking_token = (
+        secrets.token_urlsafe(32) if not request.user.is_authenticated else None
+    )
     order = Order.objects.create(
         user=request.user if request.user.is_authenticated else None,
         total_amount=total,
@@ -433,6 +459,11 @@ def create_order(request):
             Order.Status.AWAITING_PAYMENT
             if payment_method == Order.PaymentMethod.CARD
             else Order.Status.PROCESSING
+        ),
+        guest_tracking_token_hash=(
+            hashlib.sha256(guest_tracking_token.encode("utf-8")).hexdigest()
+            if guest_tracking_token
+            else None
         ),
     )
 
@@ -476,9 +507,33 @@ def create_order(request):
             "status": order.status,
             "payment_status": order.payment_status,
             "checkout_url": checkout_session.url if checkout_session else None,
+            "guest_tracking_token": guest_tracking_token,
         },
         status=status.HTTP_201_CREATED,
     )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def track_guest_order(request):
+    token = request.data.get("token", "")
+    if not isinstance(token, str):
+        token = ""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{43}", token):
+        return Response({"error": "Order tracking link is invalid."}, status=404)
+
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    order = (
+        Order.objects.prefetch_related("items")
+        .filter(user__isnull=True, guest_tracking_token_hash=token_hash)
+        .first()
+    )
+    if order is None:
+        return Response({"error": "Order tracking link is invalid."}, status=404)
+
+    response = Response(GuestOrderTrackingSerializer(order).data)
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @api_view(["GET"])
@@ -623,6 +678,54 @@ def admin_order_queue(request):
 
     orders = orders.order_by("-created_at", "-pk")
     return Response(OrderSerializer(orders, many=True).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def admin_operations_summary(request):
+    today = timezone.localdate()
+    status_counts = {
+        entry["status"]: entry["count"]
+        for entry in Order.objects.values("status").annotate(count=Count("id"))
+    }
+    paid_revenue = (
+        Order.objects.filter(
+            payment_status=Order.PaymentStatus.PAID,
+            created_at__date=today,
+        ).aggregate(total=Sum("total_amount"))["total"]
+        or Decimal("0.00")
+    )
+    low_stock_products = (
+        Product.objects.filter(stock_quantity__lte=5)
+        .select_related("category")
+        .order_by("stock_quantity", "name")
+    )
+
+    return Response(
+        {
+            "date": today.isoformat(),
+            "today_orders": Order.objects.filter(created_at__date=today).count(),
+            "paid_revenue_today": format(paid_revenue, ".2f"),
+            "status_counts": [
+                {
+                    "value": value,
+                    "label": label,
+                    "count": status_counts.get(value, 0),
+                }
+                for value, label in Order.Status.choices
+            ],
+            "low_stock_threshold": 5,
+            "low_stock_products": [
+                {
+                    "id": product.pk,
+                    "name": product.name,
+                    "category": product.category.name,
+                    "stock_quantity": product.stock_quantity,
+                }
+                for product in low_stock_products
+            ],
+        }
+    )
 
 
 @api_view(["PATCH"])

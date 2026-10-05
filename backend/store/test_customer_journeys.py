@@ -1,4 +1,5 @@
 from decimal import Decimal
+import hashlib
 
 from django.contrib.auth.models import User
 from django.urls import reverse
@@ -64,6 +65,7 @@ class CustomerJourneyApiTests(APITestCase):
         self.assertEqual(order.total_amount, Decimal("37.00"))
         self.assertEqual(order.user.username, "journey-shopper")
         self.assertEqual(order.items.get().product_name, self.product.name)
+        self.assertIsNone(order.guest_tracking_token_hash)
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 3)
 
@@ -101,5 +103,43 @@ class CustomerJourneyApiTests(APITestCase):
         self.assertFalse(Cart.objects.filter(user__isnull=True).exists())
         self.assertEqual(CartItem.objects.count(), 0)
         self.assertEqual(OrderItem.objects.filter(order=order).count(), 1)
+        token = checkout.data["guest_tracking_token"]
+        self.assertEqual(len(token), 43)
+        self.assertEqual(
+            order.guest_tracking_token_hash,
+            hashlib.sha256(token.encode("utf-8")).hexdigest(),
+        )
+
+        tracking = self.client.post(
+            reverse("track_guest_order"),
+            {"token": token},
+            format="json",
+        )
+        self.assertEqual(tracking.status_code, 200)
+        self.assertEqual(tracking.data["id"], order.id)
+        self.assertEqual(tracking.data["status"], Order.Status.PROCESSING)
+        self.assertEqual(tracking.data["items"][0]["product_name"], self.product.name)
+        self.assertNotIn("customer_email", tracking.data)
+        self.assertNotIn("phone", tracking.data)
+        self.assertNotIn("shipping_address", tracking.data)
+        self.assertNotIn("guest_tracking_token_hash", tracking.data)
+        self.assertEqual(tracking["Cache-Control"], "no-store")
 
         self.assertEqual(self.client.get(reverse("get_orders")).status_code, 401)
+
+    def test_guest_order_tracking_rejects_invalid_and_unknown_tokens(self):
+        self.client.force_authenticate(user=None)
+
+        malformed = self.client.post(
+            reverse("track_guest_order"),
+            {"token": "bad-token"},
+            format="json",
+        )
+        unknown = self.client.post(
+            reverse("track_guest_order"),
+            {"token": "A" * 43},
+            format="json",
+        )
+
+        self.assertEqual(malformed.status_code, 404)
+        self.assertEqual(unknown.status_code, 404)
