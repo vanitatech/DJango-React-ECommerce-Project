@@ -1,0 +1,71 @@
+{% extends "admin/index.html" %}
+{% load i18n %}
+
+{% block content %}
+  {% if operations.can_view_orders %}
+  <div class="module">
+    <h2>{% translate "Operations overview" %}</h2>
+    <table>
+      <tbody>
+        <tr>
+          <th scope="row">{% translate "Orders today" %}</th>
+          <td>{{ operations.today_orders }}</td>
+        </tr>
+        <tr>
+          <th scope="row">{% translate "Confirmed card revenue today" %}</th>
+          <td>${{ operations.paid_revenue_today }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <h2>{% translate "Orders by status" %}</h2>
+    <table>
+      <tbody>
+        {% for entry in operations.status_counts %}
+        <tr>
+          <th scope="row">
+            <a href="{% url 'admin:store_order_changelist' %}?status__exact={{ entry.value|urlencode }}">
+              {{ entry.label }}
+            </a>
+          </th>
+          <td>{{ entry.count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="paginator">
+      <a href="{% url 'admin:store_order_changelist' %}">{% translate "Open order management" %}</a>
+    </p>
+  </div>
+  {% endif %}
+
+  {% if operations.can_view_products %}
+  <div class="module">
+    <h2>{% translate "Low-stock alerts" %}</h2>
+    <p>{% blocktranslate with threshold=operations.low_stock_threshold %}Products with {{ threshold }} or fewer units{% endblocktranslate %}</p>
+    {% if operations.low_stock_products %}
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">{% translate "Product" %}</th>
+          <th scope="col">{% translate "Category" %}</th>
+          <th scope="col">{% translate "In stock" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for product in operations.low_stock_products %}
+        <tr>
+          <th scope="row"><a href="{% url 'admin:store_product_change' product.id %}">{{ product.name }}</a></th>
+          <td>{{ product.category }}</td>
+          <td>{{ product.stock_quantity }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>{% translate "No products are below the stock threshold." %}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+  {{ block.super }}
+  {{ block.super }}
+{% endblock %}

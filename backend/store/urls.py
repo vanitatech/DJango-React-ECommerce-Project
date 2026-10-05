@@ -29,11 +29,6 @@ urlpatterns = [
     path('orders/', views.get_orders, name='get_orders'),
     path('admin/orders/', views.admin_order_queue, name='admin_order_queue'),
     path(
-        'admin/operations/summary/',
-        views.admin_operations_summary,
-        name='admin_operations_summary',
-    ),
-    path(
         'admin/orders/<int:pk>/',
         views.update_order_fulfilment,
         name='update_order_fulfilment',

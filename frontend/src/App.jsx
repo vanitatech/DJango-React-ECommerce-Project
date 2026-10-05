@@ -15,7 +15,6 @@ import AdminOrders from './Pages/AdminOrders';
 import ContentPage from './Pages/ContentPage';
 import ContentFooter from './components/ContentFooter';
 import GuestOrderTracking from './Pages/GuestOrderTracking';
-import AdminOperations from './Pages/AdminOperations';
 
 
 function App() {
@@ -35,7 +34,6 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/wishlist" element={<WishlistPage />} />
           <Route path="/admin/orders" element={<AdminOrders />} />
-          <Route path="/admin/operations" element={<AdminOperations />} />
           <Route path="/admin/content/:slug/preview" element={<ContentPage preview />} />
         </Route>
         <Route path="/login" element={<Login />} />

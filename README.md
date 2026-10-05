@@ -169,7 +169,6 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
 /api/orders/<id>/cancel/
 /api/admin/orders/ # Staff-only searchable order queue (status/search filters)
 /api/admin/orders/<id>/ # Staff-only fulfilment updates (PATCH)
-/api/admin/operations/summary/ # Staff-only daily metrics and low-stock alerts
 /api/content/pages/ # Public list of published CMS pages
 /api/content/pages/<slug>/ # Public page content and active reusable sections
 /api/admin/content/pages/<slug>/preview/ # Staff-only draft/scheduled preview
@@ -196,8 +195,8 @@ VITE_DJANGO_BASE_URL=http://localhost:8000
   optional carrier/tracking details, and customer-visible delivery updates
 - Added private guest order tracking links backed by hashed, high-entropy
   tokens and a limited order-status response
-- Added a staff operations overview for order status, today's confirmed card
-  revenue, and low-stock products
+- Added a Django admin operations dashboard for order status, today's confirmed
+  card revenue, and low-stock products
 - Added reusable banner, text, and image content blocks with staff-managed
   publishing, staff-only previews, scheduled publication, and public,
   read-only CMS pages
@@ -226,16 +225,20 @@ database stores only a SHA-256 digest of a random token, and the tracking API
 does not expose guest email, phone, or delivery address. Ask customers to keep
 the link private.
 
-The operations dashboard counts orders by status, shows orders placed today,
-and totals confirmed Stripe card revenue for today. Cash-on-delivery and
-simulated payments are excluded from paid revenue. Low-stock alerts use a
-five-unit threshold.
+The operations dashboard appears on the Django admin home page at `/admin/`.
+It counts orders by status, shows orders placed today, and totals confirmed
+Stripe card revenue for today. Cash-on-delivery and simulated payments are
+excluded from paid revenue. Low-stock alerts use a five-unit threshold.
+The dashboard and the product, order, and CMS tools share Django admin
+authentication; visit `http://localhost:8000/admin/` and sign in with a staff
+account. The customer-facing React app does not contain a separate staff
+dashboard.
 
 ## Remaining roadmap
 
 The Stripe sandbox smoke test, customer-facing checkout work, product galleries,
-guest checkout, and expanded journey coverage are complete. The admin fulfilment
-phase is complete; the next planned feature is content management:
+guest checkout, expanded journey coverage, fulfilment tools, CMS, guest order
+tracking, and the operations dashboard are complete:
 
 1. **Continue storefront improvements** with customer-facing shopping and account
    flows.

@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 from urllib.parse import quote
 
+from .operations import get_operations_summary
 from .models import (
     Category,
     ContentBlock,
@@ -19,12 +20,26 @@ from .models import (
 )
 
 
+class StoreAdminSite(admin.AdminSite):
+    index_template = "admin/store_index.html"
+
+    def index(self, request, extra_context=None):
+        extra_context = {
+            **(extra_context or {}),
+            "operations": get_operations_summary(request.user),
+        }
+        return super().index(request, extra_context=extra_context)
+
+
+admin_site = StoreAdminSite(name="admin")
+
+
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
     extra = 1
 
 
-@admin.register(Product)
+@admin.register(Product, site=admin_site)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ('name', 'category', 'price', 'stock_quantity', 'created_at')
     list_filter = ('category',)
@@ -47,7 +62,7 @@ class PageContentBlockInline(admin.TabularInline):
     ordering = ("position", "id")
 
 
-@admin.register(ContentPage)
+@admin.register(ContentPage, site=admin_site)
 class ContentPageAdmin(admin.ModelAdmin):
     list_display = (
         "title",
@@ -92,7 +107,7 @@ class ContentPageAdmin(admin.ModelAdmin):
         )
 
 
-@admin.register(ContentBlock)
+@admin.register(ContentBlock, site=admin_site)
 class ContentBlockAdmin(admin.ModelAdmin):
     list_display = ("name", "kind", "is_active")
     list_filter = ("kind", "is_active")
@@ -100,7 +115,7 @@ class ContentBlockAdmin(admin.ModelAdmin):
     list_editable = ("is_active",)
 
 
-@admin.register(Order)
+@admin.register(Order, site=admin_site)
 class OrderAdmin(admin.ModelAdmin):
     list_display = (
         'id',
@@ -138,19 +153,19 @@ class OrderAdmin(admin.ModelAdmin):
     inlines = [OrderItemInline]
 
 
-@admin.register(Review)
+@admin.register(Review, site=admin_site)
 class ReviewAdmin(admin.ModelAdmin):
     list_display = ('product', 'user', 'rating', 'created_at')
     list_filter = ('rating', 'created_at')
     search_fields = ('product__name', 'user__username', 'comment')
 
 
-@admin.register(WishlistItem)
+@admin.register(WishlistItem, site=admin_site)
 class WishlistItemAdmin(admin.ModelAdmin):
     list_display = ('user', 'product', 'created_at')
     search_fields = ('user__username', 'product__name')
     list_filter = ('created_at',)
 
 
-admin.site.register(Category)
-admin.site.register(UserProfile)
+admin_site.register(Category)
+admin_site.register(UserProfile)
