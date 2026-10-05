@@ -63,7 +63,7 @@ def _create_stripe_checkout_session(order):
     stripe.api_key = settings.STRIPE_SECRET_KEY
     return stripe.checkout.Session.create(
         mode="payment",
-        payment_method_types=["card"],
+        managed_payments={"enabled": False},
         line_items=line_items,
         customer_email=order.customer_email or None,
         client_reference_id=str(order.pk),
@@ -77,6 +77,9 @@ def _create_stripe_checkout_session(order):
 
 @transaction.atomic
 def _apply_stripe_checkout_session(session, event_type):
+    if isinstance(session, stripe.StripeObject):
+        session = session.to_dict()
+
     session_id = session.get("id")
     order_id = (session.get("metadata") or {}).get("order_id")
     if not session_id or not order_id:
@@ -493,7 +496,7 @@ def stripe_webhook(request):
         event_type,
     )
     if error == "order_not_found":
-        logger.warning("Stripe event %s has no matching order.", event.get("id"))
+        logger.warning("Stripe event %s has no matching order.", event["id"])
         return Response(
             {"error": "The order is not available yet. Stripe should retry this event."},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,

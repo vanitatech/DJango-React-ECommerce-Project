@@ -308,8 +308,10 @@ class StoreFeatureTests(APITestCase):
             "payment_status": "paid",
             "status": "complete",
         }
-        stripe_session = SimpleNamespace(**session_data)
-        stripe_session.get = lambda key, default=None: session_data.get(key, default)
+        stripe_session = stripe.checkout.Session.construct_from(
+            session_data,
+            "sk_test_example",
+        )
 
         with override_settings(
             STRIPE_SECRET_KEY="sk_test_example",
@@ -362,6 +364,7 @@ class StoreFeatureTests(APITestCase):
                 }
             },
         }
+        stripe_event = stripe.Event.construct_from(event, "sk_test_example")
 
         with override_settings(
             STRIPE_SECRET_KEY="sk_test_example",
@@ -369,7 +372,7 @@ class StoreFeatureTests(APITestCase):
         ):
             with patch(
                 "store.views.stripe.Webhook.construct_event",
-                return_value=event,
+                return_value=stripe_event,
             ):
                 response = self.client.post(
                     reverse("stripe_webhook"),
