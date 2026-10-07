@@ -15,11 +15,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from datetime import timedelta
+from .deployment import base_path
 load_dotenv()  # Load environment variables from .env file
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+APP_BASE_PATH = base_path(os.getenv("APP_BASE_PATH", "/"))
+FORCE_SCRIPT_NAME = APP_BASE_PATH.rstrip("/") or None
 
 
 # Quick-start development settings - unsuitable for production
@@ -91,7 +94,7 @@ DB_HOST = os.getenv('DB_HOST')
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
 STRIPE_CURRENCY = 'usd'
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173' + APP_BASE_PATH.rstrip("/"))
 
 if USE_SQLITE or not (DB_NAME and DB_USER and DB_HOST):
     DATABASES = {
@@ -147,7 +150,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
-STATIC_URL = '/static/'
+STATIC_URL = APP_BASE_PATH + 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Email
@@ -170,8 +173,13 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5175",
 ]
 
-MEDIA_URL = '/media/'
+MEDIA_URL = APP_BASE_PATH + 'media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+SESSION_COOKIE_PATH = APP_BASE_PATH
+CSRF_COOKIE_PATH = APP_BASE_PATH
+if APP_BASE_PATH != "/":
+    SESSION_COOKIE_NAME = "vanitacart_sessionid"
+    CSRF_COOKIE_NAME = "vanitacart_csrftoken"
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

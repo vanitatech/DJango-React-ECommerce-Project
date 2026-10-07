@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import ProductCard from "../components/ProductCard.jsx";
+import { API_BASE } from "../utils/deployment.js";
 
 function ProductList() {
     const [products, setProducts] = useState([]);
@@ -16,7 +17,7 @@ function ProductList() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const BASE_URL = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASE_URL = API_BASE;
 
     const updateFilter = (name, value, replace = false) => {
         setSearchParams((currentParams) => {

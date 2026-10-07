@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { authFetch } from "../utils/auth.js";
+import { API_BASE } from "../utils/deployment.js";
 
 const emptyProfile = { username: "", email: "", phone: "", address: "" };
 
 function ProfilePage() {
-    const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASEURL = API_BASE;
     const [profile, setProfile] = useState(emptyProfile);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);

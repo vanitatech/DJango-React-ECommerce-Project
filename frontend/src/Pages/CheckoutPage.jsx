@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "../context/useCart.js";
 import { authFetch, getAccessToken } from "../utils/auth.js";
+import { API_BASE, storageKey } from "../utils/deployment.js";
 
 function CheckoutPage() {
-    const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASEURL = API_BASE;
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { cartItems, total, clearCart, syncGuestCart } = useCart();
@@ -128,7 +129,7 @@ function CheckoutPage() {
                 }
                 if (data.guest_tracking_token) {
                     sessionStorage.setItem(
-                        `guest_order_tracking_${data.order_id}`,
+                        storageKey(`guest_order_tracking_${data.order_id}`),
                         data.guest_tracking_token,
                     );
                 }

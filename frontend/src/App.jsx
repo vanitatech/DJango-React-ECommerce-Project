@@ -19,7 +19,7 @@ import GuestOrderTracking from './Pages/GuestOrderTracking';
 
 function App() {
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <Navbar />
       <Routes>
         <Route path="/" element={<ProductList />} />

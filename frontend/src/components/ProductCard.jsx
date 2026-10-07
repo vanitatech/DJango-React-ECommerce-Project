@@ -1,17 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/useCart.js';
+import { mediaUrl } from '../utils/deployment.js';
 
 function ProductCard({ product }) {
-    const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
     const { addToCart } = useCart();
     const [addingToCart, setAddingToCart] = useState(false);
     const [cartMessage, setCartMessage] = useState('');
     const [cartError, setCartError] = useState('');
     const imageSrc = product.external_image_url || (product.image
-        ? product.image.startsWith('http')
-            ? product.image
-            : `${BASEURL}${product.image}`
+        ? mediaUrl(product.image)
         : 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=900&q=80');
 
     const handleAddToCart = async () => {

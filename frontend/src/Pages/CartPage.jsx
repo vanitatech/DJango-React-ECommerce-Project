@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link } from "react-router-dom";
 import { useCart } from "../context/useCart.js";
+import { mediaUrl } from "../utils/deployment.js";
 
 function CartPage() {
     const { cartItems, total, removeFromCart, updateQuantity } = useCart();
-    const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
     const [pendingItemId, setPendingItemId] = useState(null);
     const [actionError, setActionError] = useState({ itemId: null, message: '' });
 
@@ -40,11 +40,7 @@ function CartPage() {
                                     <div className="flex items-center gap-4">
                                         {item.product_external_image_url || item.product_image ? (
                                             <img
-                                                src={item.product_external_image_url || (
-                                                    item.product_image.startsWith("http")
-                                                        ? item.product_image
-                                                        : `${BASEURL}${item.product_image}`
-                                                )}
+                                                src={item.product_external_image_url || mediaUrl(item.product_image)}
                                                 alt={item.product_name}
                                                 className="h-20 w-20 rounded-xl object-cover"
                                             />
