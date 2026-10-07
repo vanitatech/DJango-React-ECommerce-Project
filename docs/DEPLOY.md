@@ -448,6 +448,34 @@ need isolation between untrusted/public demos.
 
 ## 8. Remove the old root storefront route, not the running app
 
+For the selected fresh Docker deployment, the public root page is
+maintained separately in the `vanitatech-website` project as `index.html`,
+linking to Vanita's GitHub and LinkedIn profiles.
+Copy it to `/var/www/vanita-landing/index.html`, readable by Nginx.
+In the existing main-domain HTTPS server block, change the old frontend
+`root` to `/var/www/vanita-landing`, remove any server-level SPA `try_files`,
+and replace the old `location /` with:
+
+```nginx
+location = / {
+    try_files /index.html =404;
+}
+location / {
+    return 404;
+}
+```
+
+Keep both `/demos/` proxy locations, TLS directives and certificate-renewal
+locations. Validate and reload Nginx, then check the landing page, both profile
+links and both demo routes. The landing page deliberately does not list Hindi.
+This static page is deployed separately from app images.
+
+The preservation guidance below applies to migrations retaining the original
+backend. For the selected fresh replacement, retire the old API virtual host
+before disabling both `gunicorn.socket` and `gunicorn.service`; only stop host
+PostgreSQL after confirming no other application uses it. Do not delete old
+directories or databases merely to retire their services.
+
 Once section 7 passes, replace only the old root frontend/API/admin/static/media
 locations. Do not stop Gunicorn, drop the database, remove uploaded media or
 delete the existing domain certificate. Keep old files/config for rollback.
