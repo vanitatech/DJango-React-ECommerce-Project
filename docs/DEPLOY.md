@@ -11,9 +11,116 @@ new paths, then retire the old root routes. Keep the same store backend,
 database and uploaded media. No new DNS records or sub-domain certificates
 are needed: the existing domain and HTTPS certificate can serve these paths.
 
-The actual server has not been inspected. The full configuration example below
-assumes host-installed Nginx; use the discovery steps before applying it.
+The server inspected in October 2026 uses host-installed Nginx, socket-activated
+Gunicorn and local PostgreSQL on an EC2 `t3.small` in `eu-north-1`.
+The chosen replacement is a fresh Docker deployment of both apps and databases,
+retaining host Nginx and its existing HTTPS/certificate renewal configuration.
+The non-Docker examples below remain alternatives, not instructions to mix
+with the container routes.
 Root/sub-domain hosting remains supported when both base paths are `/`.
+
+## Docker deployment on the existing EC2 server
+
+Docker Engine and Compose have been installed and verified on the server.
+Keep the old services running until the new routes work; the old Gunicorn service
+is socket-activated, so retiring it requires disabling both its socket and service.
+Do not stop host PostgreSQL until no remaining applications use it.
+
+The new store stack uses three containers: PostgreSQL, Gunicorn, and Nginx serving
+the compiled frontend, static files and public media. The internal Nginx is not
+a competing HTTPS proxy: only its port 80 is published on `127.0.0.1:3302`.
+Gunicorn and PostgreSQL have no published ports. The store and Hindi use distinct
+Compose projects and volumes; the new store database starts empty.
+
+Create a private `.env` next to `docker-compose.prod.yml` (mode `600`):
+
+```dotenv
+POSTGRES_PASSWORD=YOUR_NEW_RANDOM_DATABASE_PASSWORD
+DJANGO_SECRET_KEY=YOUR_NEW_RANDOM_KEY_AT_LEAST_50_CHARACTERS
+DJANGO_ALLOWED_HOSTS=vanitatech.co.uk
+FRONTEND_URL=https://vanitatech.co.uk/demos/django-react-ecommerce
+STORE_PORT=3302
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+```
+
+Generate each secret separately with `openssl rand -hex 32` on the server; do not
+paste them into chat or commit the environment file. Stripe can be configured
+later with test keys. The Docker images contain no deployed environment file.
+
+For a local build (prefer GitHub-built images on this small instance):
+
+```sh
+sudo docker compose -p store -f docker-compose.prod.yml up -d --build
+```
+
+For GitHub-built images, add `STORE_BACKEND_IMAGE` and `STORE_FRONTEND_IMAGE`
+to the environment file using the exact commit SHA tags from the successful
+workflow, then:
+
+```sh
+sudo docker compose -p store -f docker-compose.prod.yml pull
+sudo docker compose -p store -f docker-compose.prod.yml up -d --no-build
+sudo docker compose -p store -f docker-compose.prod.yml ps
+sudo docker compose -p store -f docker-compose.prod.yml logs --tail=50 backend
+sudo docker compose -p store -f docker-compose.prod.yml exec backend \
+  python manage.py createsuperuser
+```
+
+Startup checks, migrations and `collectstatic` run before Gunicorn starts and
+stop startup on failure. Named volumes preserve database, media and static files
+across image updates. Never use `down -v` for a routine deployment. The frontend
+health check verifies its web server only; separately test the API, admin,
+database access and uploads before accepting a release.
+
+In the existing domain's HTTPS server block, use the following store routes
+**instead of** the host-installed store locations in section 5:
+
+```nginx
+location = /demos/django-react-ecommerce {
+    return 308 /demos/django-react-ecommerce/;
+}
+location ^~ /demos/django-react-ecommerce/ {
+    client_max_body_size 10m;
+    proxy_pass http://127.0.0.1:3302;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $remote_addr;
+}
+```
+
+Preserve the prefix here. The container handles prefix stripping for Django,
+React's admin exceptions and static/media paths. Use section 5's Hindi locations
+unchanged, preserving the Hindi prefix and its whole-path password gate.
+Check `sudo nginx -t` before reloading Nginx; leave existing certificates,
+renewal handling and root routes intact until verification.
+
+### GitHub Container Registry and automation
+
+The CI workflow now builds/publishes store backend and frontend images only
+after both existing test jobs pass on `main`. Manual runs are available too.
+It uses the workflow's `GITHUB_TOKEN` for publishing, not an AWS key.
+Images are tagged with the full source commit SHA:
+
+- `ghcr.io/vanitatech/django-react-ecommerce-project-backend:COMMIT_SHA`
+- `ghcr.io/vanitatech/django-react-ecommerce-project-frontend:COMMIT_SHA`
+
+Check that both packages are **Private** in GitHub package settings before
+configuring the server; do not change them to public. For private pulls, use a
+dedicated classic GitHub PAT with only `read:packages`, an expiry, and access to
+these packages (authorize organization SSO if applicable). A token owner must
+already have package read permission. Do not grant write/delete package scopes.
+Enter it through `sudo docker login ghcr.io --username YOUR_GITHUB_USERNAME`;
+the password prompt avoids putting it in shell history. Docker stores it in
+root's Docker configuration, so treat that file as a credential.
+
+These jobs **publish images, but do not yet deploy EC2**. Server automation still
+needs a restricted deployment script, GitHub OIDC role, EC2 Systems Manager
+configuration, cross-app deployment locking and application-level health checks.
+No merges, pushes or live deployment are performed by creating these files.
+The ecommerce release branch is `main`; merge the prepared feature branch only
+after review. Pin a release to its SHA; rolling back code does not reverse
+database migrations.
 
 ## 1. Discover and back up the existing deployment
 

@@ -1,0 +1,78 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: store
+      POSTGRES_DB: store
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U store -d store"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+  backend:
+    image: ${STORE_BACKEND_IMAGE:-store-backend:local}
+    build:
+      context: .
+      target: backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_BASE_PATH: /demos/django-react-ecommerce/
+      DJANGO_SETTINGS_MODULE: backend.production_settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?set DJANGO_ALLOWED_HOSTS}
+      DJANGO_TRUST_PROXY: "true"
+      DJANGO_ALLOWED_ORIGINS: ${DJANGO_ALLOWED_ORIGINS:-}
+      FRONTEND_URL: ${FRONTEND_URL:?set FRONTEND_URL}
+      USE_SQLITE: "false"
+      DB_NAME: store
+      DB_USER: store
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    volumes:
+      - media:/app/media
+      - static:/app/staticfiles
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+  frontend:
+    image: ${STORE_FRONTEND_IMAGE:-store-frontend:local}
+    build:
+      context: .
+      target: frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${STORE_PORT:-3302}:80"
+    volumes:
+      - media:/media:ro
+      - static:/static:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  pgdata:
+  media:
+  static:
