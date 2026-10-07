@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
+import { getAccessToken } from "../utils/auth.js";
 
-const hasAccessToken = () => !!localStorage.getItem("access_token");
+const hasAccessToken = () => !!getAccessToken();
 
 export default function PrivateRouter({redirectTo = "/login"}) {
     const [isAuthenticated, setIsAuthenticated] = useState(hasAccessToken);

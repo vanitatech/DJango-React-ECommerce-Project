@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import ProductCard from "../components/ProductCard.jsx";
 import { authFetch } from "../utils/auth.js";
+import { API_BASE } from "../utils/deployment.js";
 
 function WishlistPage() {
-    const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASEURL = API_BASE;
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [removingProductId, setRemovingProductId] = useState(null);

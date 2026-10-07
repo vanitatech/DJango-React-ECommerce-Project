@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { authFetch } from "../utils/auth.js";
+import { API_BASE } from "../utils/deployment.js";
 
 function ContentSection({ section }) {
     const image = section.image_url ? (
@@ -86,7 +87,7 @@ function ContentSection({ section }) {
 
 function ContentPage({ preview = false }) {
     const { slug } = useParams();
-    const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASEURL = API_BASE;
     const [page, setPage] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");

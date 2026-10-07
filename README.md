@@ -77,6 +77,27 @@ DJango-React-ECommerce-Project/
 └── .gitignore
 ```
 
+## Deployment and path migration
+
+To move the existing main-domain app to `/demos/django-react-ecommerce/` beside
+the private `/demos/hindi/` app on the same server, see [the deployment guide](./docs/DEPLOY.md).
+Bring up and verify the new paths first, then retire the old root route; retain the running backend,
+database and media. The guide covers production settings, the React build,
+reverse-proxy routing, Stripe URLs, verification and rollback.
+
+The checked-in Django settings are development-only; environment variables
+alone do not override the hardcoded debug flag, secret key or allowed hosts.
+Use `backend.production_settings` with its required private environment values,
+or preserve your existing production settings. Root/sub-domain hosting still
+works with the default base path `/`.
+
+For path hosting, set backend `APP_BASE_PATH=/demos/django-react-ecommerce/`
+and `FRONTEND_URL=https://vanitatech.co.uk/demos/django-react-ecommerce`.
+Build React with `VITE_BASE_PATH=/demos/django-react-ecommerce/` and
+`VITE_DJANGO_BASE_URL=/demos/django-react-ecommerce`. Django's proxy must strip
+the mount prefix; its media/admin URLs and cookies keep that prefix externally.
+Run frontend deployment-helper tests with `npm test` from `frontend/`.
+
 ## Local development
 
 Requirements: Python 3.10+ and Node.js 22.12+.

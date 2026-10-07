@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "../utils/auth.js";
+import { API_BASE } from "../utils/deployment.js";
 
 const statusOptions = [
     ["", "All statuses"],
@@ -21,7 +22,7 @@ function responseError(data, fallback) {
 }
 
 function AdminOrders() {
-    const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASEURL = API_BASE;
     const [orders, setOrders] = useState([]);
     const [search, setSearch] = useState("");
     const [status, setStatus] = useState("PROCESSING");

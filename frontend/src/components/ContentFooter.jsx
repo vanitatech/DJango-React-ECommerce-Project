@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { API_BASE } from "../utils/deployment.js";
 import { Link } from "react-router-dom";
 
 function ContentFooter() {
-    const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASEURL = API_BASE;
     const [pages, setPages] = useState([]);
 
     useEffect(() => {

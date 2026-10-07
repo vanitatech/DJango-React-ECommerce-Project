@@ -1,8 +1,9 @@
 import {useState} from 'react';
 import {useNavigate, useSearchParams} from 'react-router-dom';
+import { API_BASE } from '../utils/deployment.js';
 
 function Signup() {
-    const BASE = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASE = API_BASE;
     const [searchParams] = useSearchParams();
     const [form, setForm] = useState({
         username: '',

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { saveTokens } from '../utils/auth';
+import { API_BASE } from '../utils/deployment.js';
 
 function Login() {
-    const BASE = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASE = API_BASE;
     const [form, setForm] = useState({ username: '', password: '' });
     const [msg, setMsg] = useState('');
     const navigate = useNavigate();
@@ -70,7 +71,7 @@ function Login() {
                 {msg && <p className="mt-3 text-sm text-red-500">{msg}</p>}
                 <div className="mt-4 text-sm">
                     Don't have an account?{" "}
-                    <a href="/signup" className="text-blue-600 hover:underline">Sign up</a>
+                    <Link to="/signup" className="text-blue-600 hover:underline">Sign up</Link>
                 </div>
             </div>
         </div>

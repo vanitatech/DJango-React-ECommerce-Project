@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCart } from "../context/useCart.js";
 import { authFetch } from "../utils/auth.js";
+import { API_BASE, storageKey } from "../utils/deployment.js";
 
 function CheckoutReturnPage() {
-    const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASEURL = API_BASE;
     const [searchParams] = useSearchParams();
     const sessionId = searchParams.get("session_id");
     const { clearCart } = useCart();
@@ -94,10 +95,10 @@ function CheckoutReturnPage() {
                         <p className="mt-1 text-lg font-bold text-slate-900">Total: ${Number(paymentResult.order.total).toFixed(2)}</p>
                         <p className="mt-2 text-sm text-slate-600">A receipt will be sent by Stripe to the email used at checkout.</p>
                         {paymentResult.order.order_id
-                            && sessionStorage.getItem(`guest_order_tracking_${paymentResult.order.order_id}`)
+                            && sessionStorage.getItem(storageKey(`guest_order_tracking_${paymentResult.order.order_id}`))
                             && (
                                 <Link
-                                    to={`/orders/track/${encodeURIComponent(sessionStorage.getItem(`guest_order_tracking_${paymentResult.order.order_id}`))}`}
+                                    to={`/orders/track/${encodeURIComponent(sessionStorage.getItem(storageKey(`guest_order_tracking_${paymentResult.order.order_id}`)))}`}
                                     className="mt-5 inline-flex rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white hover:bg-indigo-700"
                                 >
                                     Track this order

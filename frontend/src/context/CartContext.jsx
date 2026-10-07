@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { authFetch, getAccessToken } from '../utils/auth';
 import CartContext from './CartContextValue';
+import { API_BASE, storageKey } from '../utils/deployment.js';
 
-const GUEST_CART_KEY = 'guest_cart';
+const GUEST_CART_KEY = storageKey('guest_cart');
 
 const readGuestCart = () => {
     const savedCart = localStorage.getItem(GUEST_CART_KEY);
@@ -25,7 +26,7 @@ const getCartTotal = (items) => items.reduce(
 );
 
 export const CartProvider = ({ children }) => {
-    const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASEURL = API_BASE;
     const [cartItems, setCartItems] = useState(() => getAccessToken() ? [] : readGuestCart());
     const [total, setTotal] = useState(() => getAccessToken() ? 0 : getCartTotal(readGuestCart()));
     const guestCartSync = useRef(null);

@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCart } from "../context/useCart.js";
 import { authFetch, getAccessToken } from "../utils/auth.js";
+import { API_BASE, mediaUrl } from "../utils/deployment.js";
 
 function ProductDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const BASEURL = import.meta.env.VITE_DJANGO_BASE_URL;
+    const BASEURL = API_BASE;
     const [productResult, setProductResult] = useState({ id: null, product: null, error: null });
     const [selectedImage, setSelectedImage] = useState({ productId: null, index: 0 });
     const [reviews, setReviews] = useState([]);
@@ -186,9 +187,7 @@ function ProductDetails() {
     }
 
     const imageSrc = product.image
-        ? product.image.startsWith("http")
-            ? product.image
-            : `${BASEURL}${product.image}`
+        ? mediaUrl(product.image)
         : "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=900&q=80";
     const productImage = product.external_image_url || imageSrc;
     const galleryImages = [
