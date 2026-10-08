@@ -114,9 +114,9 @@ Enter it through `sudo docker login ghcr.io --username YOUR_GITHUB_USERNAME`;
 the password prompt avoids putting it in shell history. Docker stores it in
 root's Docker configuration, so treat that file as a credential.
 
-These jobs **publish images, but do not yet deploy EC2**. Server automation still
-needs a restricted deployment script, GitHub OIDC role, EC2 Systems Manager
-configuration, cross-app deployment locking and application-level health checks.
+After publishing both images, the workflow deploys successful `main` runs
+through the restricted ecommerce Systems Manager command described below.
+Feature branches and pull requests build/test without publishing or deploying.
 No merges, pushes or live deployment are performed by creating these files.
 The ecommerce release branch is `main`; merge the prepared feature branch only
 after review. Pin a release to its SHA; rolling back code does not reverse
@@ -152,7 +152,16 @@ first ecommerce OIDC run before treating authentication as complete.
 Trust is restricted to ecommerce's `main` branch, and SendCommand is limited to
 the ecommerce document and existing instance. Result-reading requires `*`
 because GetCommandInvocation does not support resource-level permissions.
-The automatic deployment job has not yet been configured.
+The deployment job now assumes `github-deploy-ecommerce` using OIDC and invokes
+version `1` of `Vanitatech-DeployEcommerce` with the tested source commit SHA.
+It waits for the actual command result and fails on deployment errors.
+Both image matrix jobs must pass before deployment can start.
+Manual workflow runs deploy only when run on `main`.
+The first real GitHub-to-EC2 deployment still needs verification.
+GitHub serializes ecommerce deployments; the server lock coordinates Hindi
+and ecommerce. Canceling a workflow does not cancel an SSM command already sent.
+The server script and Compose configuration are installed separately; workflow
+deployments update app images, not these root-owned files or Nginx.
 Do not grant general SSM shell access or reuse Hindi's deployment role.
 
 Backups accumulate under `/var/backups/vanitatech/ecommerce`; monitor space,
