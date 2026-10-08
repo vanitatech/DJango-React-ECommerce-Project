@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "2.2",
+  "description": "Deploy tested ecommerce images on the existing demo server",
+  "parameters": {
+    "CommitSha": {
+      "type": "String",
+      "description": "Full lowercase source commit SHA",
+      "allowedPattern": "^[0-9a-f]{40}$",
+      "interpolationType": "ENV_VAR"
+    }
+  },
+  "mainSteps": [
+    {
+      "action": "aws:runShellScript",
+      "name": "deployEcommerce",
+      "inputs": {
+        "timeoutSeconds": "1800",
+        "runCommand": [
+          "/usr/local/sbin/deploy-ecommerce \"$SSM_CommitSha\""
+        ]
+      }
+    }
+  ]
+}

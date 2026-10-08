@@ -112,3 +112,42 @@ jobs:
           push: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
           tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+  deploy:
+    name: Deploy ecommerce to EC2
+    needs: images
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    concurrency:
+      group: ecommerce-production-deployment
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: eu-north-1
+      AWS_DEFAULT_REGION: eu-north-1
+      AWS_PAGER: ""
+      INSTANCE_ID: i-019b5c487c103508a
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to AWS with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::451195512799:role/github-deploy-ecommerce
+          aws-region: eu-north-1
+          role-session-name: ecommerce-${{ github.run_id }}
+      - name: Deploy the tested images and wait for completion
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          command_id=$(aws ssm send-command \
+            --document-name Vanitatech-DeployEcommerce \
+            --document-version '1' \
+            --instance-ids "$INSTANCE_ID" \
+            --parameters "CommitSha=$COMMIT_SHA" \
+            --timeout-seconds 600 \
+            --query Command.CommandId --output text --no-cli-pager)
+          echo "Systems Manager command: $command_id"
+          bash deploy/wait-for-command.sh "$command_id" "$INSTANCE_ID"

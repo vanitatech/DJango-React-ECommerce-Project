@@ -114,15 +114,62 @@ Enter it through `sudo docker login ghcr.io --username YOUR_GITHUB_USERNAME`;
 the password prompt avoids putting it in shell history. Docker stores it in
 root's Docker configuration, so treat that file as a credential.
 
-These jobs **publish images, but do not yet deploy EC2**. Server automation still
-needs a restricted deployment script, GitHub OIDC role, EC2 Systems Manager
-configuration, cross-app deployment locking and application-level health checks.
+After publishing both images, the workflow deploys successful `main` runs
+through the restricted ecommerce Systems Manager command described below.
+Feature branches and pull requests build/test without publishing or deploying.
 No merges, pushes or live deployment are performed by creating these files.
 The ecommerce release branch is `main`; merge the prepared feature branch only
 after review. Pin a release to its SHA; rolling back code does not reverse
 database migrations.
 
 ## 1. Discover and back up the existing deployment
+
+### Ecommerce deployment command preparation
+
+`deploy/deploy-ecommerce.sh` is the server-side command for the selected fresh
+Docker deployment. Install it as `/usr/local/sbin/deploy-ecommerce`, owned by
+root with mode `755`. Make `/srv/demos/ecommerce` root-owned with mode `755`,
+its Compose file root-owned with mode `644`, and its `.env` root-owned with
+mode `600`. Do not change or share the environment file's contents.
+
+The command takes one full lowercase commit SHA, pulls both fixed ecommerce
+packages, backs up PostgreSQL and uploaded media, updates the configured image
+versions, recreates the internal frontend proxy to resolve the backend's new
+address, and waits for the database-backed products API and mounted frontend.
+It uses the same server-wide lock as Hindi and does not update host Nginx,
+Hindi, or database volumes. A brief ecommerce interruption is expected.
+
+Test it with the currently deployed image SHA before configuring GitHub access.
+Then create the SSM Command document `Vanitatech-DeployEcommerce` from
+`deploy/ssm-deploy-ecommerce.json` in `eu-north-1`.
+The server command has passed its manual test and the SSM test was reported
+successful. Create `github-deploy-ecommerce` using
+`deploy/github-role-trust.json` as its custom trust policy, then attach
+`deploy/github-role-policy.json` as an inline permissions policy.
+The repository ID `1353434997` was verified through GitHub. The trust subject
+uses the ID-qualified format observed for Hindi on this account; verify the
+first ecommerce OIDC run before treating authentication as complete.
+Trust is restricted to ecommerce's `main` branch, and SendCommand is limited to
+the ecommerce document and existing instance. Result-reading requires `*`
+because GetCommandInvocation does not support resource-level permissions.
+The deployment job now assumes `github-deploy-ecommerce` using OIDC and invokes
+version `1` of `Vanitatech-DeployEcommerce` with the tested source commit SHA.
+It waits for the actual command result and fails on deployment errors.
+Both image matrix jobs must pass before deployment can start.
+Manual workflow runs deploy only when run on `main`.
+The first real GitHub-to-EC2 deployment still needs verification.
+GitHub serializes ecommerce deployments; the server lock coordinates Hindi
+and ecommerce. Canceling a workflow does not cancel an SSM command already sent.
+The server script and Compose configuration are installed separately; workflow
+deployments update app images, not these root-owned files or Nginx.
+Do not grant general SSM shell access or reuse Hindi's deployment role.
+
+Backups accumulate under `/var/backups/vanitatech/ecommerce`; monitor space,
+configure retention and keep protected off-server copies. Database and media
+backups are taken sequentially while the app runs, not as an atomic snapshot.
+For strict consistency, prevent writes during a maintenance window.
+Failures stay failed; never automatically restore the pre-release database
+or roll back an image across migrations without reviewing compatibility.
 
 On the server, run these read-only checks:
 
@@ -447,6 +494,34 @@ could access Hindi after you log in to its gate. Use sub-domains if you later
 need isolation between untrusted/public demos.
 
 ## 8. Remove the old root storefront route, not the running app
+
+For the selected fresh Docker deployment, the public root page is
+maintained separately in the `vanitatech-website` project as `index.html`,
+linking to Vanita's GitHub and LinkedIn profiles.
+Copy it to `/var/www/vanita-landing/index.html`, readable by Nginx.
+In the existing main-domain HTTPS server block, change the old frontend
+`root` to `/var/www/vanita-landing`, remove any server-level SPA `try_files`,
+and replace the old `location /` with:
+
+```nginx
+location = / {
+    try_files /index.html =404;
+}
+location / {
+    return 404;
+}
+```
+
+Keep both `/demos/` proxy locations, TLS directives and certificate-renewal
+locations. Validate and reload Nginx, then check the landing page, both profile
+links and both demo routes. The landing page deliberately does not list Hindi.
+This static page is deployed separately from app images.
+
+The preservation guidance below applies to migrations retaining the original
+backend. For the selected fresh replacement, retire the old API virtual host
+before disabling both `gunicorn.socket` and `gunicorn.service`; only stop host
+PostgreSQL after confirming no other application uses it. Do not delete old
+directories or databases merely to retire their services.
 
 Once section 7 passes, replace only the old root frontend/API/admin/static/media
 locations. Do not stop Gunicorn, drop the database, remove uploaded media or
