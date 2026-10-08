@@ -2,6 +2,8 @@
 
 A polished full-stack e-commerce storefront built with Django REST Framework and React. This project is designed to showcase real-world product browsing, authentication, cart flows, and checkout logic in a portfolio-ready application.
 
+**Live demo:** [Try VanitaCart](https://vanitatech.co.uk/demos/django-react-ecommerce/)
+
 ## Why this project matters for a portfolio
 
 This app demonstrates:
