@@ -142,8 +142,18 @@ Hindi, or database volumes. A brief ecommerce interruption is expected.
 Test it with the currently deployed image SHA before configuring GitHub access.
 Then create the SSM Command document `Vanitatech-DeployEcommerce` from
 `deploy/ssm-deploy-ecommerce.json` in `eu-north-1`.
-The GitHub role and automatic deployment job have not yet been configured.
-Do not grant general SSM shell access.
+The server command has passed its manual test and the SSM test was reported
+successful. Create `github-deploy-ecommerce` using
+`deploy/github-role-trust.json` as its custom trust policy, then attach
+`deploy/github-role-policy.json` as an inline permissions policy.
+The repository ID `1353434997` was verified through GitHub. The trust subject
+uses the ID-qualified format observed for Hindi on this account; verify the
+first ecommerce OIDC run before treating authentication as complete.
+Trust is restricted to ecommerce's `main` branch, and SendCommand is limited to
+the ecommerce document and existing instance. Result-reading requires `*`
+because GetCommandInvocation does not support resource-level permissions.
+The automatic deployment job has not yet been configured.
+Do not grant general SSM shell access or reuse Hindi's deployment role.
 
 Backups accumulate under `/var/backups/vanitatech/ecommerce`; monitor space,
 configure retention and keep protected off-server copies. Database and media
