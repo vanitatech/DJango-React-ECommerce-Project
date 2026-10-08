@@ -124,6 +124,34 @@ database migrations.
 
 ## 1. Discover and back up the existing deployment
 
+### Ecommerce deployment command preparation
+
+`deploy/deploy-ecommerce.sh` is the server-side command for the selected fresh
+Docker deployment. Install it as `/usr/local/sbin/deploy-ecommerce`, owned by
+root with mode `755`. Make `/srv/demos/ecommerce` root-owned with mode `755`,
+its Compose file root-owned with mode `644`, and its `.env` root-owned with
+mode `600`. Do not change or share the environment file's contents.
+
+The command takes one full lowercase commit SHA, pulls both fixed ecommerce
+packages, backs up PostgreSQL and uploaded media, updates the configured image
+versions, recreates the internal frontend proxy to resolve the backend's new
+address, and waits for the database-backed products API and mounted frontend.
+It uses the same server-wide lock as Hindi and does not update host Nginx,
+Hindi, or database volumes. A brief ecommerce interruption is expected.
+
+Test it with the currently deployed image SHA before configuring GitHub access.
+Then create the SSM Command document `Vanitatech-DeployEcommerce` from
+`deploy/ssm-deploy-ecommerce.json` in `eu-north-1`.
+The GitHub role and automatic deployment job have not yet been configured.
+Do not grant general SSM shell access.
+
+Backups accumulate under `/var/backups/vanitatech/ecommerce`; monitor space,
+configure retention and keep protected off-server copies. Database and media
+backups are taken sequentially while the app runs, not as an atomic snapshot.
+For strict consistency, prevent writes during a maintenance window.
+Failures stay failed; never automatically restore the pre-release database
+or roll back an image across migrations without reviewing compatibility.
+
 On the server, run these read-only checks:
 
 ```sh
