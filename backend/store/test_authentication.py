@@ -55,6 +55,30 @@ class AuthenticationApiTests(APITestCase):
         self.assertIn("password2", response.data)
         self.assertFalse(User.objects.filter(username="mismatch-shopper").exists())
 
+    def test_registration_enforces_all_configured_password_validators(self):
+        for password in (
+            "Z!7k",
+            "password",
+            "938475610293",
+            "validator-shopper",
+            "uniqueaddress@example.com",
+        ):
+            with self.subTest(password=password):
+                response = self.client.post(
+                    reverse("register"),
+                    {
+                        "username": "validator-shopper",
+                        "email": "uniqueaddress@example.com",
+                        "password": password,
+                        "password2": password,
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("password", response.data)
+                self.assertFalse(User.objects.filter(username="validator-shopper").exists())
+
     def test_jwt_login_rejects_incorrect_credentials_and_refresh_works(self):
         User.objects.create_user(
             username="registered-shopper",
