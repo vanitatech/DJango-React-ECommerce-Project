@@ -21,6 +21,12 @@ Root/sub-domain hosting remains supported when both base paths are `/`.
 
 ## Docker deployment on the existing EC2 server
 
+Public registration enforces Django's configured password validators, including
+minimum length, common/numeric passwords and similarity to username/email.
+Invalid passwords return field-level validation errors without creating a user.
+This does not retroactively strengthen existing account passwords or replace
+login abuse controls; existing users with weak passwords should change them.
+
 Docker Engine and Compose have been installed and verified on the server.
 Keep the old services running until the new routes work; the old Gunicorn service
 is socket-activated, so retiring it requires disabling both its socket and service.
